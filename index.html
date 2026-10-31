@@ -208,6 +208,13 @@ textarea.field{min-height:70px;resize:vertical}
 .err{color:var(--red);min-height:20px;margin-top:8px;font-size:13.5px}
 .pending{opacity:.6}
 .photo-busy{display:flex;align-items:center;gap:10px;padding:10px;background:var(--paper2);border-radius:4px;margin-top:10px;font-size:13.5px}
+.galerie{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:0 0 12px}
+.galerie a,.galerie .ph{display:block;position:relative;aspect-ratio:3/4;border-radius:4px;overflow:hidden;background:var(--paper2);border:1px solid var(--rule)}
+.galerie img{width:100%;height:100%;object-fit:cover;display:block;animation:fade .25s ease}
+.galerie.un{grid-template-columns:1fr}.galerie.un a,.galerie.un .ph{aspect-ratio:4/3}.galerie.un img{object-fit:contain}
+.galerie .ph{animation:pulse 1.2s ease-in-out infinite}
+.galerie .gplus{display:flex;align-items:center;justify-content:center;font-family:var(--m);font-size:22px;font-weight:700;color:var(--ink);text-decoration:none}
+.galerie-msg{font-size:12.5px;color:var(--muted);margin:-4px 0 12px}
 .spin{width:18px;height:18px;border:3px solid var(--rule);border-top-color:var(--ink);border-radius:50%;animation:sp 0.8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .month{font-family:var(--t);font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:16px 2px 6px;display:flex;justify-content:space-between}
@@ -243,9 +250,9 @@ textarea.field{min-height:70px;resize:vertical}
 <script>
 /* ================= CONFIG ================= */
 // Colle ici l'URL de ton déploiement Apps Script (…/exec). Sinon l'app te la demandera à la première ouverture.
-const API_URL = 'https://script.google.com/macros/s/AKfycbwaHRhF78AV98ig5Zk9Z4tJ-dzT3-u4RC8gbhqrDPzQ4SgD6zrPABFIdvocXRGlPM99FA/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyND7Y7DCiYQmDeK9hgPMThqgiq8UazCF9P1AZ90eM4IL804YjpZE4MNt4CTHiwKfdGMg/exec';
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1iy3H37w2_-2DAS21jzTKz2N_3QewGSZgVtQ7Thl0BKA/edit';
-const VERSION = '1.2';
+const VERSION = '1.3';
 
 /* ================= OUTILS ================= */
 const $ = s => document.querySelector(s);
@@ -642,6 +649,7 @@ function ouvrirBien(id) {
   const b = S.d.inventaire.find(x => x.id === id); if (!b) return;
   S.form = { mode: 'bien', id };
   ouvrir(tete(esc(b.objet), esc(b.marque || '')) + `
+    ${galerieHtml(b)}
     <div class="rowline" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">${pieceTag(b.piece)}<span class="badge">${esc(b.categorie || '—')}</span>${b.garantie > 2 ? `<span class="badge star">★ ${b.garantie} ans</span>` : ''}${gStamp(b.statut)}</div>
     <div class="kv">
       <div>Prix TTC</div><div class="mono"><b>${b.prix ? e2(b.prix) : '—'}</b>${b.prixAuto ? ' <span class="badge">calculé</span>' : ''}</div>
@@ -660,6 +668,35 @@ function ouvrirBien(id) {
     <div id="photoBox"></div>
     <button class="go" data-act="photo" ${b.row ? '' : 'disabled'}>📷 ${b.photo ? 'Ajouter une photo' : 'Prendre la photo'}</button>
     <button class="go sec2" data-act="bien-edit">✎ Modifier la fiche</button>`);
+  chargerGalerie(b);
+}
+
+/* ---------- photos affichées dans la fiche (action « photos-liste », miniatures gardées en mémoire) ---------- */
+const galCle = b => b.row + '|' + (b.srvObjet || b.objet) + '|' + (b.photoLabel || '');
+const galNb = b => Math.max(1, parseInt(String(b.photoLabel || '').replace(/\D+/g, ' ').trim(), 10) || 1);
+function galerieHtml(b) {
+  if (!b.photo || !b.row || S.galKO) return '';
+  const g = (S.gal || {})[galCle(b)];
+  if (!g) { const n = Math.min(galNb(b), 4); return `<div class="galerie ${n === 1 ? 'un' : ''}" id="galerie">${'<div class="ph"></div>'.repeat(n)}</div>`; }
+  if (g.err) return `<div class="galerie-msg" id="galerie">${esc(g.err)}</div>`;
+  if (!g.photos.length) return '';
+  const reste = g.total - g.photos.length, n = g.photos.length + (reste > 0 ? 1 : 0);
+  return `<div class="galerie ${n === 1 ? 'un' : ''}" id="galerie">` + g.photos.map(p => `<a href="${esc(p.url)}" target="_blank" rel="noopener" title="${esc(p.nom)}"><img src="${p.src}" alt="${esc(p.nom)}" loading="lazy"></a>`).join('')
+    + (reste > 0 ? `<a class="gplus" href="${esc(b.photo)}" target="_blank" rel="noopener">+${reste}</a>` : '') + '</div>';
+}
+async function chargerGalerie(b) {
+  if (!b.photo || !b.row || S.galKO) return;
+  S.gal = S.gal || {}; const cle = galCle(b);
+  if (S.gal[cle] && !S.gal[cle].err) return;
+  const maj = () => { const el = $('#galerie'); if (el && S.form && S.form.mode === 'bien' && S.form.id === b.id) el.outerHTML = galerieHtml(b) || '<span id="galerie"></span>'; };
+  try {
+    const r = await api('photos-liste', { row: b.row, attendu: { objet: b.srvObjet || b.objet } });
+    if (!r.ok) {
+      if (r.error === 'ACTION') { S.galKO = true; S.gal[cle] = { photos: [], total: 0 }; }   // ancien script : pas encore de galerie
+      else S.gal[cle] = { err: r.error === 'DECALE' ? 'Photos : le fichier a changé, réessaie après la synchro.' : 'Photos non chargées : ' + (r.message || 'erreur') };
+    } else S.gal[cle] = { photos: r.photos || [], total: r.total || 0 };
+  } catch (e) { S.gal[cle] = { err: 'Photos visibles dès que tu as du réseau (ou via le bouton ci-dessous).' }; }
+  maj();
 }
 function ouvrirBienEdit(id) {
   const b = id ? S.d.inventaire.find(x => x.id === id) : null;
