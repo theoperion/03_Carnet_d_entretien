@@ -135,6 +135,9 @@ main{padding:14px 14px 0}
 .prog .lab{font-family:var(--t);font-size:12px;letter-spacing:1px;color:var(--yel);text-transform:uppercase}
 .prog .et{font-family:var(--m);font-size:13px;margin-top:4px}
 .prog .gauge>i{transition:width .6s}
+.prog .stop{display:block;width:100%;margin-top:12px;padding:9px;background:transparent;border:1px solid rgba(255,255,255,.35);border-radius:4px;color:#fff;font-family:var(--t);font-size:12.5px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.prog .stop.conf{background:var(--red);border-color:var(--red)}
+.prog .stop:disabled{opacity:.5}
 .prog .gauge.run>i{background-image:repeating-linear-gradient(-45deg,var(--yel) 0 8px,#d9a200 8px 16px);background-size:23px 23px;animation:stripes 1s linear infinite}
 @keyframes stripes{to{background-position:23px 0}}
 .prog .sub{font-size:11.5px;font-style:italic;color:var(--light)}
@@ -250,9 +253,9 @@ textarea.field{min-height:70px;resize:vertical}
 <script>
 /* ================= CONFIG ================= */
 // Colle ici l'URL de ton déploiement Apps Script (…/exec). Sinon l'app te la demandera à la première ouverture.
-const API_URL = 'https://script.google.com/macros/s/AKfycbyTR4Fj6F21vBf3-Mj99WBzzBCAEhkofDTApjf-zxuqWGh_MDEHeMmN9paLznmWKy_PAg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxWpHACM9cWgsafau2BVek7w0IrBEGE-tJazoK0ZBzmD72jH6jSf0KWTptzKZVaBx35bg/exec';
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1iy3H37w2_-2DAS21jzTKz2N_3QewGSZgVtQ7Thl0BKA/edit';
-const VERSION = '1.3';
+const VERSION = '1.4';
 
 /* ================= OUTILS ================= */
 const $ = s => document.querySelector(s);
@@ -906,11 +909,13 @@ function rendreExport() {
   }
   if (f.charge) h += `<div class="empty">Vérification des exports…</div>`;
   if (enCours) h += `<div class="prog"><div class="lab">Export en cours${st.pieces && st.pieces.length ? ' · ' + esc(st.pieces.join(', ')) : ''}</div><div class="et">${esc(st.etape || '…')}</div>
-    <div class="gauge run"><i style="width:${Math.max(4, st.pct || 0)}%"></i></div><div class="sub">${st.pct || 0} % · tu peux fermer l'appli, le mail suivra</div></div>`;
+    <div class="gauge run"><i style="width:${Math.max(4, st.pct || 0)}%"></i></div><div class="sub">${st.pct || 0} % · tu peux fermer l'appli, le mail suivra</div>
+    <button class="stop ${f.stop ? 'conf' : ''}" data-act="x-stop" ${f.arret ? 'disabled' : ''}>${f.arret ? 'Annulation…' : f.stop ? 'Touche encore pour confirmer' : '✕ Annuler l\'export'}</button></div>`;
   if (st && st.etat === 'termine') h += `<div class="okbox"><h4>✓ ${st.ludo ? 'Ludothèque prête' : 'Dossier prêt'}</h4><div style="font-size:13.5px">${st.ludo ? st.nbJeux + ' jeux · ' + e0(st.valeurJeux) + ' · ' + ago(st.fin) + '</div>' : `${st.nbBiens} biens · ${st.nbAnnexes}${st.nbAnnexesPrevues ? '/' + st.nbAnnexesPrevues : ''} factures en annexe${st.pagesAnnexes ? ' (' + st.pagesAnnexes + ' p.)' : ''} · ${ago(st.fin)}</div>`}
     ${(st.avertissements || []).length ? `<ul class="warnlist">${st.avertissements.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}</div>
     <a class="go" href="${esc(st.pdf)}" target="_blank" rel="noopener">Ouvrir le PDF</a>
     <div class="btnrow">${st.docx ? `<a class="go sec2" href="${esc(st.docx)}" target="_blank" rel="noopener">Version Word</a>` : ''}<a class="go sec2" href="${esc(st.dossier)}" target="_blank" rel="noopener">Dossier Drive</a></div>`;
+  else if (st && st.etat === 'annule') h += `<div class="note">Export annulé${st.fin ? ' ' + ago(st.fin) : ''}. Tu peux en relancer un.</div>`;
   else if (st && st.etat === 'erreur') h += `<div class="errbox"><b>L'export a échoué</b><br>${esc(st.message || '')}</div>`;
   if (f.dernier && !(st && st.etat === 'termine')) h += `<div class="lbl">Dernier dossier</div><div class="list"><a class="item tap" href="${esc(f.dernier.pdf)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="grow"><div class="ttl">${esc(f.dernier.ludo ? 'Ludothèque' : (f.dernier.pieces || []).length ? f.dernier.pieces.join(', ') : 'Inventaire complet')}</div><div class="desc">${f.dernier.ludo ? f.dernier.nbJeux + ' jeux · ' + e0(f.dernier.valeurJeux) : f.dernier.nbBiens + ' biens · ' + f.dernier.nbAnnexes + ' factures'} · ${ago(f.dernier.fin)}</div></div><span class="badge">PDF ›</span></a></div>`;
   $('#sheetIn').innerHTML = h;
@@ -937,6 +942,23 @@ async function lancerExport() {
     if (!r.ok && r.error !== 'EN_COURS') { toast(r.error === 'ACTION' ? 'Mets à jour le script (Export.gs)' : 'Échec : ' + r.message); rendreExport(); return; }
     S.expSt = f.st = r.statut; rendreExport(); suivreExport();
   } catch (e) { f.envoi = false; rendreExport(); toast('Connexion impossible'); }
+}
+
+// Annulation en deux touches (la 1re arme le bouton 4 s, la 2e confirme) : pas de fenêtre de confirmation
+async function arreterExport() {
+  const f = S.form; if (!f || f.arret) return;
+  if (!f.stop) {
+    f.stop = true; rendreExport(); clearTimeout(S.stopT);
+    S.stopT = setTimeout(() => { if (S.form && S.form.mode === 'export' && S.form.stop) { S.form.stop = false; rendreExport(); } }, 4000);
+    return;
+  }
+  clearTimeout(S.stopT); f.stop = false; f.arret = true; rendreExport();
+  try {
+    const r = await api('export-annuler');
+    f.arret = false;
+    if (!r.ok) { toast(r.error === 'ACTION' ? 'Mets à jour le script (Code.gs)' : 'Échec : ' + r.message); rendreExport(); return; }
+    S.expSt = f.st = r.statut; rendreExport(); toast(r.deja ? 'L\'export était déjà terminé' : 'Export annulé');
+  } catch (e) { f.arret = false; rendreExport(); toast('Connexion impossible'); }
 }
 
 /* ---------- réglages ---------- */
@@ -1040,6 +1062,7 @@ document.addEventListener('click', ev => {
     case 'x-piece': { const p = el.dataset.p, P = S.form.pieces; if (!p) P.clear(); else if (P.has(p)) P.delete(p); else P.add(p); rendreExport(); break; }
     case 'x-ann': S.form.annexes = el.dataset.v === '1'; rendreExport(); break;
     case 'x-go': lancerExport(); break;
+    case 'x-stop': arreterExport(); break;
     case 'x-ludo': S.form.ludo = el.dataset.v === '1'; rendreExport(); break;
     case 'export-ludo': ouvrirExport(true); break;
     case 'logout': fermer(); LS.del('key'); S.key = ''; verrouiller(); break;
