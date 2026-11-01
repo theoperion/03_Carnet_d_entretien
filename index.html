@@ -248,6 +248,7 @@ textarea.field{min-height:70px;resize:vertical}
 <div class="sheet" id="sheet"><div id="sheetIn"></div></div>
 <div class="toast" id="toast"><span id="toastT"></span><button id="toastB" hidden></button></div>
 <input type="file" id="fileIn" accept="image/*" capture="environment" hidden>
+<input type="file" id="galIn" accept="image/*" multiple hidden>
 <div id="lock" hidden></div>
 
 <script>
@@ -255,7 +256,7 @@ textarea.field{min-height:70px;resize:vertical}
 // Colle ici l'URL de ton déploiement Apps Script (…/exec). Sinon l'app te la demandera à la première ouverture.
 const API_URL = 'https://script.google.com/macros/s/AKfycbxWpHACM9cWgsafau2BVek7w0IrBEGE-tJazoK0ZBzmD72jH6jSf0KWTptzKZVaBx35bg/exec';
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1iy3H37w2_-2DAS21jzTKz2N_3QewGSZgVtQ7Thl0BKA/edit';
-const VERSION = '1.4';
+const VERSION = '1.5';
 
 /* ================= OUTILS ================= */
 const $ = s => document.querySelector(s);
@@ -669,7 +670,7 @@ function ouvrirBien(id) {
     </div>
     <button class="go ${b.maif ? 'maifon' : 'sec2'}" data-act="maif" ${b.row ? '' : 'disabled'}>${b.maif ? '✓ Dans le dossier MAIF (retirer)' : '🛡 Ajouter au dossier MAIF'}</button>
     <div id="photoBox"></div>
-    <button class="go" data-act="photo" ${b.row ? '' : 'disabled'}>📷 ${b.photo ? 'Ajouter une photo' : 'Prendre la photo'}</button>
+    <div class="btnrow"><button class="go" data-act="photo" ${b.row ? '' : 'disabled'}>📷 Prendre</button><button class="go" data-act="photo-gal" ${b.row ? '' : 'disabled'}>🖼 Galerie</button></div>
     <button class="go sec2" data-act="bien-edit">✎ Modifier la fiche</button>`);
   chargerGalerie(b);
 }
@@ -816,20 +817,26 @@ function compresser(file) {
     img.onerror = rej; img.src = url;
   });
 }
-async function envoyerPhoto(file) {
-  const b = S.d.inventaire.find(x => x.id === (S.form || {}).id); if (!b || !b.row) return;
-  const box = $('#photoBox'); if (box) box.innerHTML = '<div class="photo-busy"><span class="spin"></span>Envoi de la photo vers le Drive…</div>';
-  try {
-    const data = await compresser(file);
-    const r = await api('photo', { row: b.row, attendu: { objet: b.srvObjet || b.objet }, image: data });
-    if (!r.ok) throw new Error(r.message);
-    b.photo = r.photo; b.photoLabel = r.photoLabel; sauver();
-    toast('📷 Photo rangée dans le Drive (' + r.nb + ')');
-    if (S.form && S.form.id === b.id) ouvrirBien(b.id); rendre(true);
-  } catch (e) {
-    if (box) box.innerHTML = `<div class="photo-busy" style="color:var(--red)">Photo non envoyée : ${esc(e.message || 'connexion impossible')}</div>`;
+// Une ou plusieurs photos (appareil photo ou galerie), envoyées l'une après l'autre
+async function envoyerPhotos(files) {
+  const b = S.d.inventaire.find(x => x.id === (S.form || {}).id); if (!b || !b.row || !files.length) return;
+  const n = files.length; let ok = 0, nb = 0, erreur = '';
+  for (let i = 0; i < n; i++) {
+    const box = $('#photoBox');
+    if (box) box.innerHTML = `<div class="photo-busy"><span class="spin"></span>Envoi ${n > 1 ? 'de la photo ' + (i + 1) + '/' + n : 'de la photo'} vers le Drive…</div>`;
+    try {
+      const data = await compresser(files[i]);
+      const r = await api('photo', { row: b.row, attendu: { objet: b.srvObjet || b.objet }, image: data });
+      if (!r.ok) throw new Error(r.message);
+      b.photo = r.photo; b.photoLabel = r.photoLabel; nb = r.nb; ok++; sauver();
+    } catch (e) { erreur = (e && e.message) || (e && e.type === 'error' ? 'format d\'image non lu' : 'connexion impossible'); if (!navigator.onLine) break; }
   }
+  if (ok) toast('📷 ' + (ok > 1 ? ok + ' photos rangées' : 'Photo rangée') + ' dans le Drive (' + nb + ')');
+  if (S.form && S.form.id === b.id) ouvrirBien(b.id);
+  rendre(true);
+  if (ok < n) { const box = $('#photoBox'); if (box) box.innerHTML = `<div class="photo-busy" style="color:var(--red)">${n - ok} photo${n - ok > 1 ? 's' : ''} non envoyée${n - ok > 1 ? 's' : ''} : ${esc(erreur)}</div>`; }
 }
+const envoyerPhoto = f => envoyerPhotos([f]);
 
 /* ---------- contacts ---------- */
 function ouvrirContact(id) {
@@ -1046,6 +1053,7 @@ document.addEventListener('click', ev => {
     case 'b-save': enregistrerBien(); break;
     case 'b-del': supprimerBien(); break;
     case 'photo': $('#fileIn').value = ''; $('#fileIn').click(); break;
+    case 'photo-gal': $('#galIn').value = ''; $('#galIn').click(); break;
     case 'contact': ouvrirContact(el.dataset.id); break;
     case 'contact-new': ouvrirContact(null); break;
     case 'c-save': enregistrerContact(); break;
@@ -1073,6 +1081,7 @@ document.addEventListener('input', ev => {
   if (ev.target.id === 'lq') { S.lq = ev.target.value; $('#llist').innerHTML = listeJeux(); }
 });
 $('#fileIn').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; if (f) envoyerPhoto(f); });
+$('#galIn').addEventListener('change', e => { const L = [...(e.target.files || [])].slice(0, 10); if (L.length) envoyerPhotos(L); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { rafraichir(false); pomper(); } });
 
 /* ================= DÉMARRAGE ================= */
