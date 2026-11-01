@@ -297,6 +297,48 @@ html[data-theme="nuit"] .tag,html[data-theme="cine"] .tag{filter:saturate(.85) b
 
 .conso .mini.on{background:var(--yel);color:var(--enc);border-color:var(--enc)}
 .vacline{display:flex;align-items:center;gap:8px;justify-content:space-between;border:1px dashed var(--rule);border-radius:4px;padding:8px 10px;margin-top:6px;font-size:13.5px}
+/* ================= À L'AFFICHE ================= */
+.affiche{border:2px solid var(--ink);border-radius:4px;overflow:hidden;background:var(--paper);box-shadow:3px 3px 0 var(--ink);margin:0 0 12px}
+.marquee{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--enc);color:var(--yel);font-family:var(--t);font-weight:700;font-size:13px;letter-spacing:2.5px;padding:7px 10px 6px;
+  border-bottom:4px dotted var(--yel);text-shadow:0 0 6px rgba(245,183,0,.55)}
+.marquee .nav{display:flex;align-items:center;gap:4px;letter-spacing:1px;font-size:12px;text-shadow:none}
+.marquee .nav button{color:var(--yel);font-size:20px;line-height:1;width:28px;height:24px;border-radius:3px}
+.marquee .nav button:active{background:rgba(255,255,255,.12)}
+.affiche .ecran{background:#111;line-height:0}
+.affiche.retard .ecran{box-shadow:inset 0 0 0 3px var(--red)}
+.aff-info{display:flex;align-items:center;gap:10px;padding:9px 11px 10px}
+.aff-info .ttl{font-family:var(--t);font-weight:700;font-size:16px;letter-spacing:.3px;line-height:1.15;margin-top:5px}
+.aff-info .desc{font-size:12.5px;color:var(--muted);line-height:1.3;margin-top:2px}
+.aff-info .stamp{font-size:10px}
+.sc .tourne{animation:tourne var(--d,1.2s) linear infinite;transform-box:fill-box;transform-origin:center}
+@keyframes tourne{to{transform:rotate(360deg)}}
+.sc .vapeur{animation:vapeur 2.4s ease-out infinite;animation-delay:var(--dl,0s)}
+@keyframes vapeur{0%{transform:translateY(6px);opacity:0}30%{opacity:.9}100%{transform:translateY(-14px);opacity:0}}
+.sc .goutte{animation:goutte 1.1s linear infinite;animation-delay:var(--dl,0s)}
+@keyframes goutte{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(64px);opacity:.2}}
+.sc .clign{animation:clign 1.1s steps(1) infinite}
+@keyframes clign{50%{opacity:.15}}
+.sc.retard .clign{animation-duration:.5s}
+.sc .flotte{animation:flotte 3.4s ease-in-out infinite alternate;animation-delay:var(--dl,0s)}
+@keyframes flotte{to{transform:translate(10px,-8px)}}
+.sc .vent{animation:vent 2s ease-in-out infinite;animation-delay:var(--dl,0s)}
+@keyframes vent{0%{transform:translateX(-8px);opacity:0}40%{opacity:1}100%{transform:translateX(16px);opacity:0}}
+.sc .onde{animation:onde 1.2s ease-out infinite;animation-delay:var(--dl,0s)}
+@keyframes onde{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+.sc .nuage{animation:nuage 9s ease-in-out infinite alternate}
+@keyframes nuage{to{transform:translateX(40px)}}
+.sc .tombe{animation:tombe 4.5s linear infinite;animation-delay:var(--dl,0s);transform-box:fill-box}
+@keyframes tombe{0%{transform:translate(0,0) rotate(0)}100%{transform:translate(-30px,118px) rotate(320deg)}}
+.sc .roule{animation:roule 7s ease-in-out infinite alternate}
+@keyframes roule{to{transform:translateX(150px)}}
+.sc .faisceau{animation:faisceau 2.6s ease-in-out infinite alternate}
+@keyframes faisceau{to{opacity:.55}}
+.sc .bulle{animation:bulle 3.2s linear infinite;animation-delay:var(--dl,0s)}
+.sc .flash{animation:flash 2.2s steps(1) infinite}
+@keyframes flash{0%,8%{opacity:1}9%,100%{opacity:.15}}
+.ticket{cursor:pointer}
+.aidebtn{display:inline-flex;align-items:center;gap:6px;font-family:var(--t);font-size:12px;letter-spacing:.8px;text-transform:uppercase;border:1.5px solid var(--ink);border-radius:20px;padding:5px 11px 4px;background:var(--paper);margin:0 0 6px}
+
 </style>
 </head>
 <body>
@@ -304,6 +346,7 @@ html[data-theme="nuit"] .tag,html[data-theme="cine"] .tag{filter:saturate(.85) b
   <header>
     <div class="hrow">
       <div class="htitle"><h1 id="htitle">Carnet · T3</h1><p id="hsub"></p></div>
+      <button class="ibtn" data-act="trophees" aria-label="Trophées et thèmes"><svg class="i" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4v3h-4z"/></svg></button>
       <button class="ibtn" data-act="gear" aria-label="Réglages"><svg class="i" viewBox="0 0 24 24"><path d="M10.3 4.3c.4-1.8 3-1.8 3.4 0a1.7 1.7 0 0 0 2.6 1.1c1.5-.9 3.3.8 2.4 2.4a1.7 1.7 0 0 0 1 2.5c1.9.5 1.9 3.1 0 3.5a1.7 1.7 0 0 0-1 2.6c.9 1.5-.9 3.3-2.4 2.4a1.7 1.7 0 0 0-2.6 1c-.4 1.9-3 1.9-3.4 0a1.7 1.7 0 0 0-2.6-1c-1.5.9-3.3-.9-2.4-2.4a1.7 1.7 0 0 0-1-2.6c-1.9-.4-1.9-3 0-3.5a1.7 1.7 0 0 0 1-2.5c-.9-1.6.9-3.3 2.4-2.4a1.7 1.7 0 0 0 2.6-1.1z"/><circle cx="12" cy="12" r="3"/></svg><span class="dot" id="dot"></span></button>
     </div>
     <div class="stripe"></div>
@@ -329,9 +372,9 @@ html[data-theme="nuit"] .tag,html[data-theme="cine"] .tag{filter:saturate(.85) b
 <script>
 /* ================= CONFIG ================= */
 // Colle ici l'URL de ton déploiement Apps Script (…/exec). Sinon l'app te la demandera à la première ouverture.
-const API_URL = 'https://script.google.com/macros/s/AKfycbyk7aD9i_b0OdRmpPnHfWb7w8gk39_PusG4jwCsbvsHwk4Ofw5XE_09CyXkdUK9zzty_g/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwsDzmjF3b4PLGZkLthvBPz9nFj_FIQZQOYNMTvDaFgAS8nYkpoOk18S94G_va4QJnnxQ/exec';
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1iy3H37w2_-2DAS21jzTKz2N_3QewGSZgVtQ7Thl0BKA/edit';
-const VERSION = '1.6';
+const VERSION = '1.7';
 
 /* ================= OUTILS ================= */
 const $ = s => document.querySelector(s);
@@ -518,7 +561,7 @@ function vBord() {
   const H = histo(), m0 = today().slice(0, 7), an = addDays(today(), -365);
   const ceMois = H.filter(h => h.date.slice(0, 7) === m0).length, sur12 = H.filter(h => h.date > an).length;
   const val = valeurMobilier(), pf = S.d.plafond || 28000, pct = Math.round(100 * val / pf);
-  let h = carteMotivation() + `<div class="sec"><h2>Où en est le carnet</h2></div>
+  let h = carteAffiche() + carteMotivation() + `<div class="sec"><h2>Où en est le carnet</h2></div>
   <div class="kpis">
     <button class="kpi k-red" data-act="etat" data-e="EN RETARD"><span class="lab">En retard</span><span class="val">${ret}</span><span class="sub">à faire maintenant</span></button>
     <button class="kpi k-yel" data-act="etat" data-e="BIENTÔT"><span class="lab">Sous 30 jours</span><span class="val">${bt}</span><span class="sub">à caler dans l'agenda</span></button>
@@ -1072,7 +1115,7 @@ const POISSONS = [
   ['Ange doré', '#F5C542', '#FFF3C4', 1], ['Rasbora', '#F3A683', '#574B90', 0]
 ];
 
-const jeu = () => { const j = (S.d && S.d.jeu) || {}; j.theme = j.theme || 'chantier'; j.vacances = j.vacances || []; j.gagnes = j.gagnes || []; return j; };
+const jeu = () => { if (S.d && !S.d.jeu) S.d.jeu = {}; const j = (S.d && S.d.jeu) || {}; j.theme = j.theme || 'chantier'; j.vacances = j.vacances || []; j.gagnes = j.gagnes || []; j.dates = j.dates || {}; return j; };
 function sauverJeu() { if (S.d) { S.d.jeu = jeu(); sauver(); enfiler({ op: 'call', action: 'jeu-save', payload: { jeu: S.d.jeu }, facultatif: true }); } }
 
 /* ---------- thème ---------- */
@@ -1086,7 +1129,7 @@ function appliquerTheme(id) {
 function choisirTheme(id) {
   const th = THEMES.find(t => t.id === id); if (!th) return;
   const T = trophees();
-  if (th.tr && !T.find(t => t.id === th.tr).ok) { toast('🔒 À débloquer : ' + T.find(t => t.id === th.tr).nom); return; }
+  if (th.tr && !T.find(t => t.id === th.tr).ok) return ouvrirTrophee(th.tr);
   jeu().theme = id; appliquerTheme(id); sauverJeu(); ouvrirTrophees(); rendre(true);
   toast(th.ic + ' Thème « ' + th.nom + ' »');
 }
@@ -1127,10 +1170,13 @@ function semaines() {
   return out;
 }
 function series() {
-  const W = semaines(); let cur = 0, best = 0, run = 0;
-  W.forEach(w => { if (w.etat === 'ok') { run++; best = Math.max(best, run); } else if (w.etat === 'ko') run = 0; });
+  const W = semaines(); let cur = 0, best = 0, run = 0, debut = '', bestDebut = '', bestFin = '';
+  W.forEach(w => {
+    if (w.etat === 'ok') { if (!run) debut = w.ws; run++; if (run > best) { best = run; bestDebut = debut; bestFin = addDays(w.ws, 7); } }
+    else if (w.etat === 'ko') run = 0;
+  });
   for (let i = W.length - 1; i >= 0; i--) { if (W[i].etat === 'ok') cur++; else if (W[i].etat === 'ko') break; }
-  return { cur, best };
+  return { cur, best, bestDebut, bestFin };
 }
 // mois : part des jours sans retard (jours de vacances exclus)
 function mois(m) {
@@ -1205,6 +1251,7 @@ function verifierTrophees() {
   if (!neufs.length) return;
   const premiere = !LS.get('trophees-vus', false);
   j.gagnes = [...new Set(j.gagnes.concat(neufs.map(t => t.id)))];
+  neufs.forEach(t => { if (!j.dates[t.id]) j.dates[t.id] = today(); });
   LS.set('trophees-vus', true); sauverJeu();
   const th = neufs.find(t => t.theme);
   if (premiere && neufs.length > 1) toast('🏆 ' + neufs.length + ' trophées déjà gagnés !', 'Voir', ouvrirTrophees);
@@ -1267,12 +1314,13 @@ function ouvrirTrophees() {
   const vacs = j.vacances.filter(v => v.fin >= auj).sort((a, b) => a.debut < b.debut ? -1 : 1);
   const ticket = t => {
     const [a, b] = t.prog, p = Math.max(0, Math.min(100, Math.round(100 * a / b)));
-    return `<div class="ticket ${t.ok ? 'ok' : 'lock'}"><span class="adm">${t.ok ? 'GAGNÉ' : 'N° ' + String(T.indexOf(t) + 1).padStart(2, '0')}</span><div class="ic">${t.ic}</div>
+    return `<div class="ticket ${t.ok ? 'ok' : 'lock'}" data-act="trophee" data-id="${t.id}"><span class="adm">${t.ok ? 'GAGNÉ' : 'N° ' + String(T.indexOf(t) + 1).padStart(2, '0')}</span><div class="ic">${t.ic}</div>
       <div class="n">${esc(t.nom)}</div><div class="d">${esc(t.desc)}</div>
       ${t.ok ? '' : `<div class="gauge"><i style="width:${p}%"></i></div>`}
       <div class="r">${t.theme ? '🎨 thème ' + esc(t.theme.nom) : '🐟 ' + esc(t.poisson[0])}${t.ok ? '' : ' · ' + Math.min(a, b) + '/' + b}</div></div>`;
   };
   ouvrir(tete('Trophées', `🔥 série ${sr.cur} sem. · record ${sr.best} · 🏆 ${T.filter(t => t.ok).length}/${T.length}`) + `
+    <button class="aidebtn" data-act="aide">❓ Comment ça marche</button> <span class="muted" style="font-size:12px">· touche un trophée pour le détail</span>
     <div class="lbl">La pellicule · 12 derniers mois</div>
     <div class="pellicule" id="film">${film}</div>
     <p class="muted" style="font-size:12px;margin:6px 2px 0">★ mois parfait (aucun retard) · % des jours sans retard · le mois en cours est en pointillés</p>
@@ -1281,7 +1329,7 @@ function ouvrirTrophees() {
       const tr = th.tr ? T.find(t => t.id === th.tr) : null, ok = !tr || tr.ok;
       return `<button class="th ${j.theme === th.id ? 'on' : ''} ${ok ? '' : 'lock'}" data-act="theme" data-t="${th.id}">
         <div class="sw">${th.sw.map(c => `<i style="background:${c}"></i>`).join('')}</div><div class="bd" style="background:${th.bd}"></div>
-        <div class="nm">${th.ic} ${esc(th.nom)}</div><div class="cd">${j.theme === th.id ? '✓ en cours' : ok ? 'Toucher pour l\'appliquer' : '🔒 ' + esc(tr.nom) + ' : ' + esc(tr.desc.toLowerCase())}</div></button>`;
+        <div class="nm">${th.ic} ${esc(th.nom)}</div><div class="cd">${j.theme === th.id ? '✓ en cours · ' : ''}${!tr ? 'Thème de base' : ok ? 'Débloqué par « ' + esc(tr.nom) + ' »' : '🔒 ' + esc(tr.nom) + ' : ' + esc(tr.desc.toLowerCase())}</div></button>`;
     }).join('')}</div>
     <div class="lbl" style="margin-top:16px">Trophées</div>
     <div class="tickets">${T.filter(t => t.ok).concat(T.filter(t => !t.ok)).map(ticket).join('')}</div>
@@ -1366,6 +1414,219 @@ function basculerRachat(id) {
   c.racheter = !c.racheter;
   if (c.row) enfiler({ op: 'call', action: 'conso-racheter', payload: { row: c.row, attendu: c.srv || { article: c.article }, racheter: c.racheter } });
   ouvrirConso(); rendre(true);
+}
+
+/* ================= À L'AFFICHE : une scène animée par chose à faire ================= */
+// Chaque zone du carnet et chaque partie de l'inventaire a sa scène ; l'état (en retard / bientôt / ok) change le décor.
+function sceneTache(t) {
+  const x = (t.zone + ' ' + t.element).toLowerCase();
+  if (/aquarium/.test(x)) return 'filtreaq';
+  if (/aspirateur|robot/.test(x)) return 'robot';
+  if (/bouilloire|cafeti|gourde|électroménager|electromenager/.test(x)) return 'cafe';
+  if (/lave-linge/.test(x)) return 'linge';
+  if (/cuisine/.test(x)) return 'cuisine';
+  if (/salle de bain|wc|siphon|douche/.test(x)) return 'sdb';
+  if (/ventilation|vmc|clim|aldes/.test(x)) return 'vmc';
+  if (/sécurité|securite|fumée/.test(x)) return 'alarme';
+  if (/menuiserie|fenêtre|volet|mur/.test(x)) return 'fenetre';
+  if (/extérieur|exterieur|balcon/.test(x)) return 'balcon';
+  return 'outils';
+}
+function aFaire() {
+  const E = S.d.entretien, I = S.d.inventaire, auj = today(), out = [];
+  const tache = (t, niv) => out.push({ scene: sceneTache(t), niv, titre: t.element, sous: t.intervention, quand: ech(t.jours), act: 'fait', el: t.element, bouton: '✓ FAIT' });
+  E.filter(t => t.etat === 'EN RETARD').sort(ordreUrg).forEach(t => tache(t, 'retard'));
+  I.filter(b => b.finGarantie && b.finGarantie >= auj && b.finGarantie <= addDays(auj, 30)).sort((a, b) => a.finGarantie < b.finGarantie ? -1 : 1)
+    .forEach(b => out.push({ scene: b.piece === 'Salle ciné' ? 'cine' : 'garantie', niv: 'bientot', titre: 'Garantie · ' + b.objet, sous: 'Teste-le à fond avant la fin : un défaut constaté avant est pris en charge', quand: 'fin le ' + frCourt(b.finGarantie), act: 'bien', id: b.id, bouton: 'Voir', ecran: '🛡 ' + frCourt(b.finGarantie) }));
+  E.filter(t => t.etat === 'BIENTÔT' && t.jours <= 7).sort(ordreUrg).forEach(t => tache(t, 'bientot'));
+  const R = (S.d.consommables || []).filter(c => c.racheter);
+  if (R.length) out.push({ scene: 'courses', niv: 'bientot', titre: R.length + ' consommable' + (R.length > 1 ? 's' : '') + ' à racheter', sous: R.map(c => c.article).slice(0, 3).join(' · '), quand: '', act: 'conso', bouton: '🛒 Liste' });
+  const cine = I.filter(b => b.piece === 'Salle ciné' && !b.photo);
+  if (cine.length) out.push({ scene: 'cine', niv: 'ok', titre: 'Salle ciné · ' + cine.length + ' bien' + (cine.length > 1 ? 's' : '') + ' sans photo', sous: 'Tout photographier débloque le trophée Projectionniste et le thème Salle obscure', quand: '', act: 'aff-photos', piece: 'Salle ciné', bouton: '📷 Voir', ecran: '📷 ' + cine.length });
+  const J = (S.d.jeux || []).filter(j => j.assure && !j.valeur);
+  if (J.length) out.push({ scene: 'ludo', niv: 'ok', titre: 'Ludothèque · ' + J.length + ' jeu' + (J.length > 1 ? 'x' : '') + ' sans valeur', sous: 'Une valeur pour chacun débloque le trophée Ludothécaire', quand: '', act: 'ludo', bouton: '🎲 Voir' });
+  const P = I.filter(b => b.categorie !== 'Travaux' && b.piece !== 'Salle ciné' && !b.photo);
+  if (P.length) out.push({ scene: 'photo', niv: 'ok', titre: P.length + ' bien' + (P.length > 1 ? 's' : '') + ' sans photo', sous: "Utile pour l'assurance, et vers le trophée Paparazzi", quand: '', act: 'aff-photos', piece: '', bouton: '📷 Voir' });
+  E.filter(t => t.etat === 'BIENTÔT' && t.jours > 7).sort(ordreUrg).slice(0, 3).forEach(t => tache(t, 'plus-tard'));
+  if (!out.length) out.push({ scene: 'cine', niv: 'relache', titre: 'Relâche ce soir 🍿', sous: 'Tout est à jour : séance libre dans la salle ciné', quand: '', ecran: 'RELÂCHE' });
+  return out.slice(0, 8);
+}
+
+const SCN = {
+  // cuisine : plaque, casserole et hotte ; en retard → fumée et taches de graisse
+  cuisine: (r) => `<rect width="340" height="122" fill="#F6E7D2"/>${[0, 1, 2, 3, 4, 5, 6, 7].map(i => `<rect x="${i * 44}" y="0" width="43" height="70" fill="#F9EFE2" stroke="#E7D3B8"/>`).join('')}
+    <path d="M118 0 H222 L240 28 H100Z" fill="#B9BCC2"/><rect x="100" y="28" width="140" height="5" fill="#8E9299"/>
+    ${r ? '<circle cx="140" cy="16" r="4" fill="#8A6A2E" opacity=".6"/><circle cx="196" cy="12" r="5" fill="#8A6A2E" opacity=".5"/><circle cx="172" cy="21" r="3" fill="#8A6A2E" opacity=".55"/>' : ''}
+    <rect x="0" y="86" width="340" height="36" fill="#C9B79C"/><rect x="0" y="82" width="340" height="6" fill="#8C6F4E"/>
+    <rect x="132" y="56" width="70" height="28" rx="4" fill="#4A4F57"/><rect x="128" y="52" width="78" height="6" rx="2" fill="#2F3339"/>
+    <rect x="200" y="54" width="8" height="4" rx="1" fill="#2F3339"/>
+    <path d="M150 82 q17 6 34 0" stroke="${r ? '#E2571E' : '#3E8EF7'}" stroke-width="3" fill="none" class="${r ? 'clign' : ''}"/>
+    <rect x="96" y="92" width="150" height="26" rx="3" fill="#2B2F36"/><rect x="108" y="97" width="126" height="15" rx="2" fill="${r ? '#5A3B1E' : '#3D4450'}"/>
+    ${[0, 1, 2].map(k => `<path class="vapeur" style="--dl:${-k * .8}s" d="M${158 + k * 9} 48 q-6 -8 0 -16 q6 -8 0 -16" stroke="${r ? '#7D7D7D' : 'rgba(255,255,255,.95)'}" stroke-width="${r ? 6 : 3}" fill="none" stroke-linecap="round"/>`).join('')}`,
+  // salle de bain : douche ; en retard → calcaire, moisissures, plus d'eau
+  sdb: (r) => `<rect width="340" height="122" fill="#DCEFF3"/>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => `<path d="M${i * 36} 0 V122" stroke="#C3E0E6"/>`).join('')}${[0, 1, 2, 3].map(i => `<path d="M0 ${i * 32} H340" stroke="#C3E0E6"/>`).join('')}
+    <path d="M60 0 V18 H118" stroke="#9AA3AB" stroke-width="6" fill="none"/><path d="M106 18 h34 l-6 10 h-22z" fill="#9AA3AB"/>
+    ${r ? '<rect x="110" y="27" width="26" height="4" rx="2" fill="#F2F2EC"/><circle cx="14" cy="112" r="5" fill="#4F7A43" opacity=".7"/><circle cx="26" cy="116" r="3" fill="#4F7A43" opacity=".6"/><circle cx="324" cy="110" r="6" fill="#4F7A43" opacity=".6"/><circle cx="308" cy="116" r="3" fill="#4F7A43" opacity=".6"/>'
+      : [0, 1, 2, 3, 4, 5, 6].map(k => `<path class="goutte" style="--dl:${(-k * .17).toFixed(2)}s" d="M${112 + k * 4} 32 v7" stroke="#3E8EF7" stroke-width="2" stroke-linecap="round"/>`).join('')}
+    <rect x="0" y="104" width="340" height="18" fill="#BFD9DE"/><ellipse cx="124" cy="108" rx="40" ry="4" fill="${r ? '#D8D4C4' : '#A9CFE0'}"/>
+    <rect x="236" y="40" width="44" height="62" rx="4" fill="#fff" stroke="#AFC9CF"/><circle cx="258" cy="56" r="10" fill="#E3F1F4"/>${r ? '<path d="M248 92 h20" stroke="#D8D4C4" stroke-width="4"/>' : ''}`,
+  // lave-linge : hublot qui tourne ; en retard → tambour arrêté, odeur
+  linge: (r) => `<rect width="340" height="122" fill="#E3EEF2"/><rect x="0" y="108" width="340" height="14" fill="#C7D6DC"/>
+    <rect x="120" y="22" width="100" height="88" rx="6" fill="#FAFAFA" stroke="#B8C4C9" stroke-width="2"/><rect x="128" y="28" width="40" height="8" rx="2" fill="#D6DEE2"/><circle cx="206" cy="32" r="4" fill="${r ? '#E5484D' : '#3FA266'}" class="clign"/>
+    <circle cx="170" cy="72" r="28" fill="#2B3A44" stroke="#9AA9B0" stroke-width="5"/>
+    <g class="${r ? '' : 'tourne'}" style="--d:1.4s"><circle cx="170" cy="72" r="20" fill="#5D7F95"/><path d="M155 66 q15 10 30 0 M155 78 q15 -10 30 0" stroke="#A9C6D8" stroke-width="5" fill="none"/></g>
+    ${r ? [0, 1, 2].map(k => `<path class="vapeur" style="--dl:${-k}s" d="M${238 + k * 10} 60 q-5 -6 0 -12 q5 -6 0 -12" stroke="#8E9A5C" stroke-width="3" fill="none"/>`).join('') : ''}`,
+  // VMC : bouche avec hélice ; en retard → poussière, hélice au ralenti
+  vmc: (r) => `<rect width="340" height="122" fill="#E8EEF0"/><circle cx="170" cy="60" r="44" fill="#F6F8F9" stroke="#C3CDD2" stroke-width="3"/><circle cx="170" cy="60" r="36" fill="#DDE4E8"/>
+    <g class="tourne" style="--d:${r ? '4s' : '.9s'}">${[0, 72, 144, 216, 288].map(a => `<path transform="rotate(${a} 170 60)" d="M170 60 q8 -20 0 -32 q-12 8 0 32" fill="${r ? '#9AA0A6' : '#5DADE2'}"/>`).join('')}</g><circle cx="170" cy="60" r="5" fill="#53606A"/>
+    ${r ? [0, 1, 2, 3, 4, 5, 6, 7].map(k => `<circle class="flotte" style="--dl:${-k * .6}s" cx="${60 + k * 30}" cy="${20 + (k * 23) % 80}" r="${1.5 + k % 3}" fill="#9C9384" opacity=".75"/>`).join('')
+      : [0, 1, 2].map(k => `<path class="vent" style="--dl:${-k * .7}s" d="M${238 + k * 6} ${40 + k * 18} q14 -6 28 0 t28 0" stroke="#9FD3EA" stroke-width="2.5" fill="none" stroke-linecap="round"/>`).join('')}`,
+  // détecteur de fumée : voyant qui clignote (vert / rouge + bip)
+  alarme: (r) => `<rect width="340" height="122" fill="#EEE9DF"/><rect width="340" height="20" fill="#F8F5EF"/><rect x="0" y="20" width="340" height="3" fill="#DDD5C6"/>
+    <ellipse cx="170" cy="34" rx="46" ry="14" fill="#FBFBF8" stroke="#CFC7B8" stroke-width="2"/><rect x="124" y="20" width="92" height="14" fill="#FBFBF8"/>${[0, 1, 2, 3, 4].map(k => `<path d="M${146 + k * 10} 38 h6" stroke="#CFC7B8" stroke-width="2"/>`).join('')}
+    <circle cx="200" cy="30" r="4" fill="${r ? '#E5484D' : '#3FA266'}" class="clign"/>
+    ${r ? [1, 2, 3].map(k => `<path class="onde" style="--dl:${-k * .3}s" d="M${170 - k * 22} ${58 + k * 6} q${k * 22} ${k * 12} ${k * 44} 0" stroke="#E5484D" stroke-width="2.5" fill="none"/>`).join('') + '<text x="170" y="108" text-anchor="middle" font-family="Oswald,Arial" font-size="15" font-weight="700" fill="#E5484D">BIP · TEST À FAIRE</text>'
+      : '<text x="170" y="100" text-anchor="middle" font-family="Oswald,Arial" font-size="13" fill="#6E6556">veille · tout va bien</text>'}`,
+  // fenêtre et volet : ciel et nuages ; en retard → volet de travers, condensation
+  fenetre: (r) => `<rect width="340" height="122" fill="#E9E1D2"/><rect x="100" y="10" width="140" height="102" fill="${r ? '#9FB3BF' : '#8FD3F4'}"/>
+    ${r ? '' : '<circle cx="210" cy="40" r="12" fill="#FFD84D"/><g class="nuage"><ellipse cx="140" cy="44" rx="18" ry="7" fill="#fff"/><ellipse cx="152" cy="40" rx="11" ry="7" fill="#fff"/></g>'}
+    <rect x="100" y="10" width="140" height="102" fill="none" stroke="#F7F4EE" stroke-width="8"/><path d="M170 10 V112" stroke="#F7F4EE" stroke-width="6"/>
+    <g transform="${r ? 'rotate(-5 100 10)' : ''}">${[0, 1, 2, 3, 4].map(k => `<rect x="100" y="${10 + k * 8}" width="140" height="7" fill="#C9C2B5" stroke="#B3AB9C"/>`).join('')}</g>
+    ${r ? [0, 1, 2, 3, 4].map(k => `<path class="goutte" style="--dl:${-k * .4}s" d="M${112 + k * 26} 60 v6" stroke="#5D7F95" stroke-width="2" stroke-linecap="round"/>`).join('') : ''}<rect x="92" y="110" width="156" height="6" fill="#F7F4EE"/>`,
+  // balcon : plante et soleil ; en retard → feuilles mortes qui tombent
+  balcon: (r) => `<rect width="340" height="122" fill="${r ? '#C9D3DA' : '#BFE6F6'}"/>${r ? '' : '<circle cx="290" cy="28" r="14" fill="#FFD84D"/>'}<rect x="0" y="100" width="340" height="22" fill="#D9CDB3"/>
+    ${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(k => `<rect x="${k * 40 + 10}" y="62" width="4" height="40" fill="#5B6670"/>`).join('')}<rect x="0" y="58" width="340" height="6" fill="#5B6670"/>
+    <path d="M70 100 l6 -22 h28 l6 22z" fill="#C46A3C"/><g class="algue"><path d="M90 78 C80 60 88 44 82 30 M90 78 C96 60 108 52 112 38 M90 78 C88 64 98 58 96 46" stroke="${r ? '#9C8B4E' : '#3FA86E'}" stroke-width="4" fill="none"/></g>
+    <rect x="180" y="84" width="60" height="6" fill="#8C6F4E"/><rect x="186" y="90" width="4" height="12" fill="#8C6F4E"/><rect x="230" y="90" width="4" height="12" fill="#8C6F4E"/>
+    ${r ? [0, 1, 2, 3, 4].map(k => `<path class="tombe" style="--dl:${-k * .9}s" d="M${60 + k * 55} 0 q5 -3 9 0 q-5 3 -9 0z" fill="#B5762E"/>`).join('') : ''}`,
+  // petit électroménager : bouilloire ; en retard → calcaire, plus de vapeur
+  cafe: (r) => `<rect width="340" height="122" fill="#F3E9DA"/><rect x="0" y="92" width="340" height="30" fill="#B79A74"/><rect x="0" y="88" width="340" height="6" fill="#8C6F4E"/>
+    <path d="M140 88 l6 -46 h48 l6 46z" fill="#E9ECEF" stroke="#AEB4BA" stroke-width="2"/><path d="M200 50 q20 4 12 28" stroke="#AEB4BA" stroke-width="6" fill="none"/><path d="M140 44 l-16 -10" stroke="#AEB4BA" stroke-width="6"/>
+    <rect x="148" y="34" width="44" height="8" rx="3" fill="#5D6670"/><circle cx="170" cy="80" r="3" fill="${r ? '#E5484D' : '#3FD0C9'}" class="clign"/>
+    ${r ? '<path d="M146 84 h48" stroke="#F4F1E6" stroke-width="5"/><text x="250" y="60" font-family="Oswald,Arial" font-size="13" fill="#8C6F4E">calcaire !</text>'
+      : [0, 1, 2].map(k => `<path class="vapeur" style="--dl:${-k * .8}s" d="M${118 - k * 6} 30 q-6 -8 0 -14 q6 -8 0 -14" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>`).join('')}`,
+  // robot aspirateur : il roule ; en retard → arrêté, moutons de poussière
+  robot: (r) => `<rect width="340" height="122" fill="#EFE6D2"/><rect x="0" y="72" width="340" height="50" fill="#C8A97E"/>${[0, 1, 2, 3, 4, 5, 6, 7].map(k => `<path d="M${k * 46} 72 V122" stroke="#B8976B"/>`).join('')}
+    <g class="${r ? '' : 'roule'}"><ellipse cx="80" cy="96" rx="36" ry="12" fill="#2B2F36"/><ellipse cx="80" cy="91" rx="36" ry="12" fill="#3D434C"/><circle cx="80" cy="88" r="7" fill="#22252A"/><circle cx="96" cy="88" r="2.5" fill="${r ? '#E5484D' : '#3FD0C9'}" class="clign"/></g>
+    ${r ? [0, 1, 2, 3].map(k => `<g class="flotte" style="--dl:${-k * .7}s"><circle cx="${170 + k * 40}" cy="${100 - (k % 2) * 8}" r="6" fill="#B7AFA1"/><circle cx="${176 + k * 40}" cy="${98 - (k % 2) * 8}" r="4" fill="#C9C1B3"/></g>`).join('') : ''}
+    <rect x="270" y="34" width="44" height="66" rx="6" fill="#F7F7F5" stroke="#BDB8AE" stroke-width="2"/><rect x="278" y="44" width="28" height="8" rx="2" fill="#3FD0C9" opacity=".6"/>`,
+  // salle ciné : rideaux, écran, faisceau du projecteur, fauteuils
+  cine: (r, e) => `<rect width="340" height="122" fill="#160A0C"/><rect x="62" y="12" width="216" height="76" fill="#F2EAD6"/>
+    <path class="faisceau" d="M330 0 L62 12 L62 88 L330 6z" fill="rgba(255,240,200,.10)"/>
+    <text x="170" y="${e && e.length > 7 ? 58 : 62}" text-anchor="middle" font-family="Oswald,Arial" font-size="${e && e.length > 7 ? 18 : 26}" font-weight="700" fill="#22252A">${esc(e || '')}</text>
+    ${e ? '' : '<g class="tourne" style="--d:3s;transform-box:view-box;transform-origin:170px 50px"><path d="M170 34 V50" stroke="#22252A" stroke-width="3" stroke-linecap="round"/></g><circle cx="170" cy="50" r="20" fill="none" stroke="#22252A" stroke-width="3"/>'}
+    <path d="M0 0 H70 Q60 50 72 122 H0Z" fill="#9E1B2E"/><path d="M340 0 H270 Q280 50 268 122 H340Z" fill="#9E1B2E"/>${[14, 32, 50].map(x => `<path d="M${x} 0 Q${x - 6} 60 ${x + 2} 122" stroke="#7A1222" stroke-width="3" fill="none"/><path d="M${340 - x} 0 Q${346 - x} 60 ${338 - x} 122" stroke="#7A1222" stroke-width="3" fill="none"/>`).join('')}
+    ${[0, 1, 2, 3, 4, 5].map(k => `<path d="M${84 + k * 30} 122 v-14 q0 -8 10 -8 h6 q10 0 10 8 v14z" fill="#2B334A"/>`).join('')}`,
+  // garantie : bouclier et sablier qui s'écoule
+  garantie: (r, e) => `<rect width="340" height="122" fill="#EFE6D2"/><path d="M130 14 l40 -8 l40 8 v34 c0 30 -22 48 -40 58 c-18 -10 -40 -28 -40 -58z" fill="#2F7A4A"/><path d="M146 52 l16 16 l30 -32" stroke="#fff" stroke-width="7" fill="none"/>
+    <g transform="translate(250 30)"><path d="M0 0 h30 M0 60 h30" stroke="#5B4630" stroke-width="4"/><path d="M4 2 q11 26 11 28 q0 2 -11 28 h22 q-11 -26 -11 -28 q0 -2 11 -28z" fill="#FBF7EE" stroke="#5B4630" stroke-width="2"/>
+    <path d="M10 48 q5 -6 10 0 v8 h-10z" fill="#E2B44F"/><path class="goutte" d="M15 30 v6" stroke="#E2B44F" stroke-width="2"/></g>
+    <text x="60" y="66" text-anchor="middle" font-family="Oswald,Arial" font-size="16" font-weight="700" fill="#5B4630">${esc(e || '')}</text>`,
+  // consommables : chariot qui roule
+  courses: () => `<rect width="340" height="122" fill="#F3ECDD"/><rect x="0" y="104" width="340" height="18" fill="#CDBF9F"/>
+    <g class="roule"><path d="M40 40 h14 l14 46 h56 l12 -34 h-78" stroke="#22252A" stroke-width="5" fill="none" stroke-linejoin="round"/><circle cx="76" cy="98" r="7" fill="#22252A"/><circle cx="118" cy="98" r="7" fill="#22252A"/>
+    <rect x="76" y="40" width="16" height="20" rx="2" fill="#3FD0C9"/><rect x="96" y="34" width="14" height="26" rx="2" fill="#F5B700"/><rect x="113" y="44" width="14" height="16" rx="2" fill="#E2571E"/></g>`,
+  // ludothèque : boîte de jeu et dés qui roulent
+  ludo: () => `<rect width="340" height="122" fill="#2F6B4A"/><rect x="20" y="16" width="300" height="94" rx="10" fill="none" stroke="#3E8A5E" stroke-width="3" stroke-dasharray="8 6"/>
+    <rect x="60" y="30" width="110" height="70" rx="4" fill="#C2362B"/><rect x="66" y="36" width="98" height="58" rx="3" fill="#E2571E"/><text x="115" y="72" text-anchor="middle" font-family="Oswald,Arial" font-size="18" font-weight="700" fill="#fff">JEU</text>
+    <g class="tourne" style="--d:2.4s"><rect x="210" y="40" width="30" height="30" rx="5" fill="#FBF7EE"/><circle cx="218" cy="48" r="3" fill="#22252A"/><circle cx="232" cy="62" r="3" fill="#22252A"/><circle cx="225" cy="55" r="3" fill="#22252A"/></g>
+    <g class="tourne" style="--d:3.1s"><rect x="252" y="66" width="26" height="26" rx="5" fill="#F5B700"/><circle cx="259" cy="73" r="2.6" fill="#22252A"/><circle cx="271" cy="85" r="2.6" fill="#22252A"/></g>`,
+  // photos : appareil et flash
+  photo: () => `<rect width="340" height="122" fill="#E9E1D2"/><rect x="120" y="36" width="100" height="64" rx="8" fill="#2B2F36"/><rect x="140" y="28" width="30" height="12" rx="3" fill="#2B2F36"/>
+    <circle cx="170" cy="68" r="22" fill="#4A5260"/><circle cx="170" cy="68" r="14" fill="#1E2A38"/><circle cx="164" cy="62" r="4" fill="rgba(255,255,255,.5)"/>
+    <rect x="198" y="42" width="14" height="8" rx="2" fill="#F5F0E0" class="flash"/><path class="flash" d="M205 20 v-12 M222 26 l8 -8 M188 26 l-8 -8" stroke="#F5B700" stroke-width="3" stroke-linecap="round"/>`,
+  // entretien de l'aquarium : masse filtrante rincée dans un seau d'eau du bac ; en retard → mousse marron, eau trouble
+  filtreaq: (r) => `<rect width="340" height="122" fill="#CFE9EE"/><rect x="0" y="0" width="150" height="80" fill="${r ? '#7E8E6A' : '#5FB7CF'}" opacity=".55"/><rect x="0" y="76" width="150" height="6" fill="#2B2F36"/>
+    ${r ? '' : [0, 1, 2].map(k => `<circle class="bulle" style="--dl:${(-k * .9).toFixed(1)}s" cx="${120 + k * 6}" cy="70" r="2" fill="rgba(255,255,255,.8)"/>`).join('')}
+    <rect x="0" y="100" width="340" height="22" fill="#B9C9CC"/>
+    <path d="M196 56 h96 l-10 58 h-76z" fill="#2E86AB"/><ellipse cx="244" cy="56" rx="48" ry="8" fill="${r ? '#8C7A4E' : '#7FD3E6'}"/><path d="M200 56 q44 -40 88 0" stroke="#22252A" stroke-width="3" fill="none"/>
+    <g class="${r ? '' : 'flotte'}"><rect x="222" y="20" width="44" height="26" rx="5" fill="${r ? '#6B5A3A' : '#F5D76E'}"/>${[0, 1, 2, 3, 4].map(k => `<circle cx="${230 + k * 7}" cy="${28 + (k % 2) * 8}" r="2.2" fill="${r ? '#4A3E26' : '#E0B83E'}"/>`).join('')}</g>
+    ${r ? '<text x="244" y="14" text-anchor="middle" font-family="Oswald,Arial" font-size="12" font-weight="700" fill="#5A3B1E">À RINCER !</text>' : [0, 1, 2].map(k => `<path class="goutte" style="--dl:${-k * .35}s" d="M${236 + k * 8} 48 v5" stroke="#2E86AB" stroke-width="2" stroke-linecap="round"/>`).join('')}
+    <text x="75" y="44" text-anchor="middle" font-family="Oswald,Arial" font-size="12" fill="#fff">${r ? 'eau trouble' : 'eau du bac'}</text>`,
+  // par défaut : caisse à outils
+  outils: (r) => `<rect width="340" height="122" fill="#EFE6D2"/><rect x="110" y="56" width="120" height="50" rx="4" fill="#C2362B"/><path d="M146 56 v-12 h48 v12" stroke="#22252A" stroke-width="5" fill="none"/>
+    <g class="tourne" style="--d:4s"><path d="M262 40 l20 20 M272 30 a10 10 0 1 0 0.1 0" stroke="#5D6670" stroke-width="6" fill="none" stroke-linecap="round"/></g>`
+};
+function sceneSvg(it) {
+  if (it.scene === 'aquarium') {
+    const E = S.d.entretien, ajour = E.length ? Math.round(100 * E.filter(t => t.etat !== 'EN RETARD').length / E.length) : 100;
+    return aquariumHtml(trophees(), ajour, it.niv !== 'retard');
+  }
+  const f = SCN[it.scene] || SCN.outils;
+  return `<svg class="aq sc ${it.niv === 'retard' ? 'retard' : ''}" viewBox="0 0 340 122" role="img" aria-label="${esc(it.titre)}">${f(it.niv === 'retard', it.ecran)}</svg>`;
+}
+function carteAffiche() {
+  const L = aFaire(); S.affI = Math.min(S.affI || 0, L.length - 1);
+  const it = L[S.affI], n = L.length;
+  const etiquette = { retard: 'EN RETARD', bientot: 'BIENTÔT', ok: 'À FAIRE', 'plus-tard': 'PROCHAINEMENT', relache: 'RELÂCHE' }[it.niv];
+  const bouton = it.act === 'fait' ? `<button class="fait" data-act="fait" data-el="${esc(it.el)}">${ICON.check}FAIT</button>`
+    : it.act === 'bien' ? `<button class="mini" data-act="bien" data-id="${it.id}">${it.bouton}</button>`
+    : it.act ? `<button class="mini" data-act="${it.act}" data-p="${esc(it.piece || '')}">${it.bouton}</button>` : '';
+  return `<div class="affiche ${it.niv}" id="affiche">
+    <div class="marquee"><span>★ À L'AFFICHE ★</span>${n > 1 ? `<span class="nav"><button data-act="aff-prev" aria-label="Précédent">‹</button><b>${S.affI + 1}/${n}</b><button data-act="aff-next" aria-label="Suivant">›</button></span>` : ''}</div>
+    <div class="ecran">${sceneSvg(it)}</div>
+    <div class="aff-info"><div class="grow"><span class="stamp st-${it.niv === 'retard' ? 'RETARD' : it.niv === 'relache' ? 'RAS' : 'BIENTOT'}">${etiquette}</span>
+      <div class="ttl">${esc(it.titre)}</div><div class="desc">${esc(it.sous)}${it.quand ? ' · <b class="mono">' + esc(it.quand) + '</b>' : ''}</div></div>${bouton}</div></div>`;
+}
+function affNav(d) {
+  const n = aFaire().length; S.affI = ((S.affI || 0) + d + n) % n;
+  const el = $('#affiche'); if (el) el.outerHTML = carteAffiche();
+}
+
+/* ---------- trophées : pourquoi, comment, quand ---------- */
+function explication(t) {
+  const E = S.d.entretien, H = histo(), d0 = debutCarnet(), sr = series();
+  const I = S.d.inventaire.filter(b => b.categorie !== 'Travaux'), liste = (L, k) => L.slice(0, k || 4).join(', ') + (L.length > (k || 4) ? '…' : '');
+  const [a, b] = t.prog;
+  switch (t.id) {
+    case 'chiffon': case 'rode': case 'pilier': case 'legende':
+      return `Tu as noté ${a} passage${a > 1 ? 's' : ''}${d0 ? ' depuis le ' + fr(d0) : ''}.`;
+    case 'ordre': { const R = E.filter(x => x.etat === 'EN RETARD'); return R.length ? `En retard en ce moment : ${liste(R.map(x => x.element))}.` : 'Aucune tâche en retard en ce moment.'; }
+    case 'tour': { const R = E.filter(x => !x.dernier); return R.length ? `Jamais faites : ${liste(R.map(x => x.element))}.` : `Les ${b} tâches du carnet ont toutes été faites au moins une fois.`; }
+    case 'pyro': { const p = H.filter(h => /^four\b/i.test(h.element)).map(h => h.date).sort().pop(); return p ? `Dernière pyrolyse notée le ${fr(p)}.` : 'Aucune pyrolyse notée pour l\'instant (tâche « Four »).'; }
+    case 'aqua': { const R = E.filter(x => /aquarium/i.test(x.zone + ' ' + x.element) && x.etat === 'EN RETARD');
+      return R.length ? `« ${R[0].element} » est en retard depuis le ${fr(addDays(R[0].prochain, 1))} : la suite repart de zéro.` : `${a} entretien${a > 1 ? 's' : ''} d'aquarium d'affilée fait${a > 1 ? 's' : ''} à l'heure (au plus tard le jour prévu).`; }
+    case 'cine': { const R = S.d.inventaire.filter(x => x.piece === 'Salle ciné' && !x.photo); return R.length ? `${a}/${b} biens de la salle ciné en photo. Il manque : ${liste(R.map(x => x.objet))}.` : `Les ${b} biens de la salle ciné ont leur photo.`; }
+    case 'serie4': case 'serie12': case 'serie26':
+      return sr.best ? `Ta meilleure série : ${sr.best} semaine${sr.best > 1 ? 's' : ''} sans retard (du ${fr(sr.bestDebut)} au ${fr(addDays(sr.bestFin, -1))}). Série actuelle : ${sr.cur}.` : 'Pas encore de semaine complète sans retard.';
+    case 'mois': { const P = moisListe(24).map(mois).filter(x => x && x.parfait).map(x => MOIS[+x.m.slice(5, 7) - 1] + ' ' + x.m.slice(0, 4));
+      return P.length ? `Mois parfait${P.length > 1 ? 's' : ''} : ${liste(P, 6)}.` : 'Aucun mois complet sans retard pour l\'instant (le mois en cours compte quand il sera fini).'; }
+    case 'papa': { const R = I.filter(x => !x.photo); return R.length ? `${a}/${b} biens en photo. Sans photo : ${liste(R.map(x => x.objet))}.` : 'Tout l\'inventaire a sa photo.'; }
+    case 'beton': { const R = I.filter(x => !(x.prix && (x.facture || x.photo))); return R.length ? `${a}/${b} biens complets. À compléter : ${liste(R.map(x => x.objet))}.` : 'Chaque bien a un prix et une facture ou une photo.'; }
+    case 'ludo': { const R = (S.d.jeux || []).filter(j => j.assure && !j.valeur); return (S.d.jeux || []).length ? (R.length ? `Sans valeur : ${liste(R.map(j => j.titre))}.` : 'Tous les jeux assurés ont une valeur.') : 'Ludothèque vide pour l\'instant.'; }
+    case 'conso': { const R = (S.d.consommables || []).filter(c => !(c.prix && c.lien)); return R.length ? `Sans prix ou sans lien : ${liste(R.map(c => c.article))}.` : 'Chaque consommable a un prix et un lien d\'achat.'; }
+    case 'annee': return d0 ? `Premier passage noté le ${fr(d0)} (il y a ${diffJ(today(), d0)} jours).` : 'Aucun passage noté.';
+  }
+  return '';
+}
+function ouvrirTrophee(id) {
+  const T = trophees(), t = T.find(x => x.id === id); if (!t) return;
+  const j = jeu(), d = (j.dates || {})[id], [a, b] = t.prog, p = Math.max(0, Math.min(100, Math.round(100 * a / b)));
+  S.form = { mode: 'trophee', id };
+  ouvrir(tete(t.ic + ' ' + esc(t.nom), t.ok ? (d ? 'Obtenu le ' + fr(d) : 'Obtenu') : 'Pas encore obtenu · ' + Math.min(a, b) + '/' + b) + `
+    ${t.ok ? '' : `<div class="gauge" style="background:var(--paper2);height:10px;margin-bottom:12px"><i style="width:${p}%"></i></div>`}
+    <div class="kv">
+      <div>Comment l'obtenir</div><div>${esc(t.desc)}</div>
+      <div>${t.ok ? 'Pourquoi tu l\'as' : 'Où tu en es'}</div><div>${esc(explication(t))}</div>
+      <div>Récompense</div><div>${t.theme ? '🎨 Thème « ' + esc(t.theme.nom) + ' »' : '🐟 Un ' + esc(t.poisson[0].toLowerCase()) + ' dans l\'aquarium de l\'accueil'}</div>
+      ${t.ok ? `<div>Obtenu</div><div class="mono">${d ? fr(d) : 'avant le suivi des dates'}</div>` : ''}
+    </div>
+    ${t.theme && t.ok ? `<button class="go" data-act="theme" data-t="${t.theme.id}">${j.theme === t.theme.id ? '✓ Thème en cours' : 'Appliquer le thème ' + esc(t.theme.nom)}</button>` : ''}
+    <button class="go sec2" data-act="trophees">‹ Tous les trophées</button>`);
+}
+function ouvrirAide() {
+  S.form = { mode: 'aide' };
+  ouvrir(tete('❓ Comment ça marche') + `
+    <div class="kv">
+      <div>🎬 À l'affiche</div><div>En haut de l'accueil : la chose la plus urgente à faire, avec la scène de sa zone (cuisine, salle de bain, VMC, balcon, aquarium, salle ciné…). En retard, le décor se dégrade (fumée, calcaire, poussière, feuilles mortes) ; ‹ › pour voir les suivantes. Quand tout est à jour : relâche, la salle ciné est à toi.</div>
+      <div>🐟 Aquarium</div><div>Un poisson par trophée gagné. L'eau se trouble quand des tâches sont en retard. Le filtre fait des bulles, sauf si l'entretien de l'aquarium est en retard.</div>
+      <div>🔥 Série</div><div>Nombre de semaines d'affilée (du lundi au dimanche) sans aucune tâche en retard. Une tâche est en retard dès le lendemain de sa date prévue.</div>
+      <div>🎞 Pellicule</div><div>Un photogramme par mois : ★ si le mois entier s'est passé sans retard, sinon la part des jours sans retard.</div>
+      <div>🏆 Trophées</div><div>Calculés à partir de ton historique et de l'inventaire. Une fois gagné, un trophée reste gagné. Touche un trophée pour voir comment l'obtenir et pourquoi tu l'as.</div>
+      <div>🎨 Thèmes</div><div>Chaque thème est la récompense d'un trophée (indiqué sur sa carte). Le thème choisi suit sur tous tes appareils.</div>
+      <div>🏖 Vacances</div><div>Les semaines d'absence ne comptent pas : la série est en pause, et le mail de rappel d'entretien ne part pas.</div>
+    </div>
+    <button class="go sec2" data-act="trophees">‹ Trophées</button>`);
 }
 
 /* ---------- réglages ---------- */
@@ -1475,6 +1736,11 @@ document.addEventListener('click', ev => {
     case 'x-ludo': S.form.ludo = el.dataset.v === '1'; rendreExport(); break;
     case 'export-ludo': ouvrirExport(true); break;
     case 'trophees': ouvrirTrophees(); break;
+    case 'trophee': ouvrirTrophee(el.dataset.id); break;
+    case 'aide': ouvrirAide(); break;
+    case 'aff-prev': affNav(-1); break;
+    case 'aff-next': affNav(1); break;
+    case 'aff-photos': fermer(); S.tab = 'inventaire'; S.iPiece = el.dataset.p || null; S.iFiltre = 'photo'; rendre(); scrollTo(0, 0); break;
     case 'theme': choisirTheme(el.dataset.t); break;
     case 'vac-add': ajouterVacances(); break;
     case 'vac-del': retirerVacances(el.dataset.d); break;
