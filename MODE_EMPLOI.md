@@ -12,7 +12,7 @@
 | Script Google (API) | dépôt privé `theoperion/app_scripts`, dossier `carnet-t3/` (Code, Export, Video) |
 | Données | Google Sheet « Appartement T3 · Carnet & inventaire » : Tableau de bord, Entretien, Historique, Consommables, Inventaire, Jeux de société, Achats Amazon, Contacts, Stats achats |
 
-**Mise en ligne** : Claude publie sur `main` chaque étape validée, en disant ce qu'il publie (autorisé par Théo le 05/11/2026). E-mails d'échéance : envoyés par un réveil du script, indépendant de l'adresse ; état visible dans l'appli (« Mail d'échéance : ✅ actif »).
+**Mise en ligne** : Claude publie sur `main` chaque étape validée, en disant ce qu'il publie (autorisé par Théo le 05/11/2026). E-mails d'échéance : envoyés par un réveil du script, indépendant de l'adresse ; **un seul mail par tâche et par échéance, jamais de relance** (la tâche reste dans l'appli jusqu'à « FAIT ») ; garanties et plafond : une fois aussi ; état visible dans l'appli (« Mail d'échéance : ✅ actif »).
 
 **Les 3 interdits** : plus de copier-coller dans l'éditeur Apps Script ; plus jamais « Nouveau déploiement » (une seule adresse) ; rien sans étape validée ici.
 
@@ -36,7 +36,8 @@ Légende : ⬜ à faire · 🟡 proposé · 🔧 en cours · ✅ fait et vérifi
 - ✅ Étape 3 · **Sécurité** (script 1.8) : plus d'action par l'adresse (clé hors URL) ; mauvaises clés freinées ; bibliothèque PDF de l'export vérifiée par empreinte avant exécution.
 - ✅ Étape 4 · **Export et ménage** : verrou au démarrage de l'export ; fonctions dangereuses de `Video.js` retirées (la galerie photos reste). Gros exports > 6 min : inchangé (on verra seulement si ça arrive).
 - **Numéro de version** : dans `version.js`, le seul endroit à changer.
-- ⬜ 0.4 Numéro de version unique (comme Versus)
+- ✅ 0.4 Numéro de version unique (`version.js`)
+- ✅ Étape 5 · **Mail une seule fois** (script 1.8.1) : plus de relance tous les 7 jours pour une tâche en retard.
 
 ## 4. Journal
 
@@ -45,3 +46,4 @@ Légende : ⬜ à faire · 🟡 proposé · 🔧 en cours · ✅ fait et vérifi
 | 05/11/2026 | 0.1 | Mode d'emploi créé ; script récupéré (Code 709 l., Export 1 272 l., Video 206 l.) ; audit lancé |
 | 05/11/2026 | 0.2–0.3, B1 | Audit ; 8 adresses alignées ; lien des e-mails corrigé (version Google 15) |
 | 05/11/2026 | 1–4 | Appli 1.8 et script 1.8 (version Google 16, 8 adresses) : toute la checklist corrigée sauf l'export > 6 min |
+| 05/11/2026 | 5 | Mail d'échéance envoyé une seule fois par tâche, sans relance (script 1.8.1, version Google 17, 8 adresses) |
