@@ -498,6 +498,10 @@ async function rafraichir(force) {
 function enfiler(op) {
   op.uid = op.uid || nouvelUid();   // 1.8 : identifiant unique, le serveur ignore un renvoi (plus de doublon après une coupure)
   // 1.8 : un élément créé puis modifié avant l'envoi → une seule écriture (la dernière), pas deux lignes
+  if (op.op === 'call' && op.action === 'jeu-save') {   // 1.8.1 : thème/trophées : seule la dernière sauvegarde compte
+    const q = S.queue.find((o, i) => !(i === 0 && S.busy) && o.action === 'jeu-save');
+    if (q) { q.payload = op.payload; sauver(); pomper(); return; }
+  }
   if (op.op === 'call' && op.after && op.id && /-save$/.test(op.action)) {
     const q = S.queue.find((o, i) => !(i === 0 && S.busy) && o.op === 'call' && o.after === op.after && o.id === op.id && o.action === op.action);
     if (q) { q.payload = op.payload; sauver(); pomper(); return; }
