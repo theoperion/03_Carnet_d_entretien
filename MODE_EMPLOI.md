@@ -31,7 +31,11 @@ Légende : ⬜ à faire · 🟡 proposé · 🔧 en cours · ✅ fait et vérifi
 - ✅ 0.2 Audit complet → checklist : `app_scripts/audits/carnet-t3-2026-11.md` (objectif : corriger les bugs sans chambouler l'appli)
 - ✅ 0.3 Une seule adresse : les 7 anciennes adresses servent le même code
 - ✅ B1 Lien de l'appli dans les e-mails corrigé (`03_Carnet_d_entretien`) · script version Google 15
-- 🟡 Étape 1 · File d'attente hors connexion fiable (A1 à A6) · Étape 2 · Autres bugs (B2 à B7) · Étape 3 · Sécurité (C1 à C3) · Étape 4 · Ménage (E1)
+- ✅ Étape 1 · **File d'attente hors connexion fiable** (appli 1.8) : une erreur n'efface plus les autres saisies (erreur passagère = réessai, refus = seule cette saisie est retirée, avec message) ; identifiant unique par envoi → plus de doublon après une coupure ; créé puis modifié = une seule écriture ; supprimé avant l'envoi = rien ne part ; les lignes suivent après une suppression ; délai maximal 30 s ; ressaisir la clé ne vide plus la file ; plus de passage « fantôme ». Testé avec un faux serveur.
+- ✅ Étape 2 · **Autres bugs** : mise à jour fiable (`version.js`, un seul numéro ; réseau d'abord) ; fréquences décimales bien comptées ; mail de test sans effet sur le rappel ; fond vert du thème Chantier ; confirmation avant de supprimer un contact ; chargement plus rapide.
+- ✅ Étape 3 · **Sécurité** (script 1.8) : plus d'action par l'adresse (clé hors URL) ; mauvaises clés freinées ; bibliothèque PDF de l'export vérifiée par empreinte avant exécution.
+- ✅ Étape 4 · **Export et ménage** : verrou au démarrage de l'export ; fonctions dangereuses de `Video.js` retirées (la galerie photos reste). Gros exports > 6 min : inchangé (on verra seulement si ça arrive).
+- **Numéro de version** : dans `version.js`, le seul endroit à changer.
 - ⬜ 0.4 Numéro de version unique (comme Versus)
 
 ## 4. Journal
@@ -40,3 +44,4 @@ Légende : ⬜ à faire · 🟡 proposé · 🔧 en cours · ✅ fait et vérifi
 |---|---|---|
 | 05/11/2026 | 0.1 | Mode d'emploi créé ; script récupéré (Code 709 l., Export 1 272 l., Video 206 l.) ; audit lancé |
 | 05/11/2026 | 0.2–0.3, B1 | Audit ; 8 adresses alignées ; lien des e-mails corrigé (version Google 15) |
+| 05/11/2026 | 1–4 | Appli 1.8 et script 1.8 (version Google 16, 8 adresses) : toute la checklist corrigée sauf l'export > 6 min |

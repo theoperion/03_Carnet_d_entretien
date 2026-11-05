@@ -17,7 +17,7 @@
   --kraft:#EFE6D2;--paper:#FBF7EE;--paper2:#F3ECDD;--ink:#22252A;--ink2:#3A3E45;
   --yel:#F5B700;--ora:#E2571E;--red:#C2362B;--grn:#2F7A4A;--grey:#CFC5B0;
   --rule:#CDBF9F;--muted:#6E6556;--light:#B9B2A3;
-  --enc:#22252A;--card:#fff;--okbg:var(--okbg);--dots:rgba(110,101,86,.07);
+  --enc:#22252A;--card:#fff;--okbg:#E2F0E5;--dots:rgba(110,101,86,.07);
   --t:'Oswald',Impact,sans-serif;--b:'Roboto Condensed',Arial Narrow,sans-serif;--m:'Roboto Mono',ui-monospace,monospace;
   --safeB:env(safe-area-inset-bottom,0px);--safeT:env(safe-area-inset-top,0px);
   --stripe:repeating-linear-gradient(-45deg,var(--yel) 0 9px,var(--enc) 9px 18px);
@@ -369,12 +369,13 @@ html[data-theme="nuit"] .tag,html[data-theme="cine"] .tag{filter:saturate(.85) b
 <input type="file" id="galIn" accept="image/*" multiple hidden>
 <div id="lock" hidden></div>
 
+<script src="version.js"></script>
 <script>
 /* ================= CONFIG ================= */
 // Colle ici l'URL de ton déploiement Apps Script (…/exec). Sinon l'app te la demandera à la première ouverture.
 const API_URL = 'https://script.google.com/macros/s/AKfycbwsDzmjF3b4PLGZkLthvBPz9nFj_FIQZQOYNMTvDaFgAS8nYkpoOk18S94G_va4QJnnxQ/exec';
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1iy3H37w2_-2DAS21jzTKz2N_3QewGSZgVtQ7Thl0BKA/edit';
-const VERSION = '1.7';
+const VERSION = (self.CARNET_VERSION || {}).app || '?';   // le numéro se change dans version.js
 
 /* ================= OUTILS ================= */
 const $ = s => document.querySelector(s);
@@ -452,7 +453,7 @@ function etatDe(t) {
 function recalc(t) { // recalcule une tâche à partir de l'historique local (comme les formules du fichier)
   const h = S.d.historique.filter(x => x.element === t.element && !x.deleted);
   t.dernier = h.reduce((m, x) => x.date > m ? x.date : m, '');
-  t.prochain = t.dernier && t.freq ? edate(t.dernier, t.freq) : '';
+  t.prochain = t.dernier && t.freq ? plusFreq(t.dernier, t.freq) : '';   // 1.8 : fréquence décimale (0,5 mois…) bien comptée
   t.jours = t.prochain ? diffJ(t.prochain, today()) : null;
   t.etat = etatDe(t);
 }
@@ -462,15 +463,20 @@ const valeurMobilier = () => S.d.inventaire.filter(x => x.categorie !== 'Travaux
 const histo = () => S.d.historique.filter(x => !x.deleted);
 
 /* ================= API ================= */
-function api(action, extra) {
-  const body = JSON.stringify(Object.assign({ action, key: S.key }, extra || {}));
-  return fetch(apiUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow' })
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+function api(action, extra, uid) {
+  const body = JSON.stringify(Object.assign({ action, key: S.key }, extra || {}, uid ? { uid } : {}));
+  // 1.8 : délai maximal de 30 s (avant : une connexion figée bloquait la file sans message)
+  const ab = window.AbortController ? new AbortController() : null, minu = ab ? setTimeout(() => ab.abort(), 30000) : null;
+  return fetch(apiUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow', signal: ab ? ab.signal : undefined })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .finally(() => clearTimeout(minu));
 }
+const nouvelUid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 function setSync(s) { $('#dot').className = 'dot' + (s === 'sync' ? ' sync' : s === 'off' ? ' off' : ''); }
 function charger(d) {
   // conserve les passages locaux pas encore envoyés
-  const loc = S.d ? S.d.historique.filter(x => x.pending && !x.row) : [];
+  const enFile = new Set(S.queue.filter(o => o.op === 'fait').map(o => o.id || (o.h && o.h.id)));
+  const loc = S.d ? S.d.historique.filter(x => x.pending && !x.row && enFile.has(x.id)) : [];   // 1.8 : plus de passage « fantôme » resté en « envoi… »
   S.d = d; S.d.historique = d.historique.concat(loc.filter(l => !d.historique.some(h => h.row && h.element === l.element && h.date === l.date && !l.row)));
   if (loc.length) S.d.entretien.forEach(recalc);
   rafraichirEtats(); sauver();
@@ -489,7 +495,24 @@ async function rafraichir(force) {
 }
 
 /* file d'écritures : l'écran se met à jour tout de suite, l'envoi suit */
-function enfiler(op) { S.queue.push(op); sauver(); pomper(); }
+function enfiler(op) {
+  op.uid = op.uid || nouvelUid();   // 1.8 : identifiant unique, le serveur ignore un renvoi (plus de doublon après une coupure)
+  // 1.8 : un élément créé puis modifié avant l'envoi → une seule écriture (la dernière), pas deux lignes
+  if (op.op === 'call' && op.after && op.id && /-save$/.test(op.action)) {
+    const q = S.queue.find((o, i) => !(i === 0 && S.busy) && o.op === 'call' && o.after === op.after && o.id === op.id && o.action === op.action);
+    if (q) { q.payload = op.payload; sauver(); pomper(); return; }
+  }
+  S.queue.push(op); sauver(); pomper();
+}
+/** 1.8 : un élément supprimé avant que sa création soit partie → on retire la création en attente (il ne réapparaît plus) */
+function retirerEnAttente(after, id) { S.queue = S.queue.filter((o, i) => (i === 0 && S.busy) || !(o.op === 'call' && o.after === after && o.id === id)); sauver(); }
+/** 1.8 : après une suppression de ligne dans le fichier, les lignes du dessous remontent d'un cran : l'appli suit */
+function decalerLignes(feuille, ligne) {
+  const l = feuille === 'inv' ? S.d.inventaire : null; if (!l) return;
+  l.forEach(x => { if (x.row && x.row > ligne) x.row--; });
+  S.queue.forEach(o => { if (o.op === 'call' && /^inv-/.test(o.action) && o.payload && o.payload.row > ligne) o.payload.row--; });
+}
+const ERREURS_PASSAGERES = ['SERVEUR', 'OCCUPE', 'VERROU'];
 async function pomper() {
   if (S.busy) return;
   const op = S.queue[0];
@@ -501,31 +524,46 @@ async function pomper() {
       const h = op.h || S.d.historique.find(x => x.id === op.id);
       if (!h || h.deleted) res = { ok: true, skip: true };
       else {
-        res = await api('fait', { element: h.element, date: h.date, duree: h.duree });
+        res = await api('fait', { element: h.element, date: h.date, duree: h.duree }, op.uid);
         if (res.ok) {
           h.row = res.row; h.pending = false; h.srv = { date: h.date, element: h.element };
           // annulé pendant l'envoi : on retire la ligne qui vient d'être écrite
-          if (h.deleted) { S.queue.push({ op: 'annuler', row: res.row, attendu: h.srv }); delete res.tache; }
+          if (h.deleted) { S.queue.push({ op: 'annuler', row: res.row, attendu: h.srv, uid: nouvelUid() }); delete res.tache; }
         }
       }
     } else if (op.op === 'annuler') {
-      res = await api('fait-annuler', { row: op.row, attendu: op.attendu });
+      res = await api('fait-annuler', { row: op.row, attendu: op.attendu }, op.uid);
     } else if (op.op === 'maj') {
       const h = S.d.historique.find(x => x.id === op.id);
       if (!h || !h.row) res = { ok: true };
-      else { res = await api('passage-maj', { row: h.row, attendu: h.srv, date: h.date, duree: h.duree }); if (res.ok) { h.srv = { date: h.date, element: h.element }; h.pending = false; } }
+      else { res = await api('passage-maj', { row: h.row, attendu: h.srv, date: h.date, duree: h.duree }, op.uid); if (res.ok) { h.srv = { date: h.date, element: h.element }; h.pending = false; } }
     } else {
-      res = await api(op.action, op.payload);
+      // 1.8 : la ligne est relue au moment de l'envoi (un élément créé hors ligne a pu recevoir sa ligne entre-temps)
+      if (op.after && op.id && op.payload && !op.payload.row) {
+        const liste = { bien: S.d.inventaire, contact: S.d.contacts, conso: S.d.consommables || [] }[op.after], o = liste && liste.find(x => x.id === op.id);
+        if (o && o.row) { op.payload.row = o.row; if (op.after === 'bien') op.payload.attendu = { objet: o.srvObjet || o.objet }; else if (o.srv) op.payload.attendu = o.srv; }
+      }
+      res = await api(op.action, op.payload, op.uid);
       if (res.ok && op.after) apresAppel(op, res);
+      if (res.ok && res.ligneSupprimee) decalerLignes('inv', res.ligneSupprimee);
     }
-  } catch (e) { S.busy = false; setSync('off'); setTimeout(pomper, 8000); return; }
-  S.queue.shift(); S.busy = false;
+  } catch (e) { S.busy = false; setSync('off'); setTimeout(pomper, 8000); return; }   // réseau : on garde tout et on réessaie
+  S.busy = false;
   if (!res.ok && op.facultatif && res.error === 'ACTION') res = { ok: true };   // script pas encore à jour : sans gravité
   if (!res.ok) {
     if (res.error === 'CLE') { sauver(); return verrouiller(res.message); }
-    toast('Pas enregistré dans le fichier : ' + (res.message || 'erreur'));
-    S.queue = []; sauver(); S.lastFetch = 0; rafraichir(true); return;
+    // 1.8 : erreur passagère (fichier occupé…) → on garde l'opération et on réessaie ; avant, TOUTE la file était vidée
+    op.essais = (op.essais || 0) + 1;
+    if (ERREURS_PASSAGERES.includes(res.error) && op.essais < 5) { sauver(); setSync('off'); setTimeout(pomper, 8000 * op.essais); return; }
+    // refus définitif : on ne retire QUE cette opération, les autres saisies continuent de partir
+    S.queue.shift();
+    if (op.op === 'fait') { const h = op.h || S.d.historique.find(x => x.id === op.id); if (h && !h.row) { S.d.historique = S.d.historique.filter(x => x !== h); S.d.entretien.forEach(recalc); } }
+    toast('Pas enregistré dans le fichier : ' + (res.message || 'erreur') + (S.queue.length ? ' · les autres saisies continuent' : ''));
+    sauver(); rendre(true); S.lastFetch = 0;
+    if (S.queue.length) pomper(); else rafraichir(true);
+    return;
   }
+  S.queue.shift();
   if (res.tache) { const t = S.d.entretien.find(x => x.element === res.tache.element); if (t && !S.queue.some(o => o.op === 'fait' || o.op === 'maj')) Object.assign(t, res.tache); }
   sauver(); rendre(true); pomper();
 }
@@ -731,7 +769,7 @@ function rendreFait() {
       <label class="chip ${autre ? 'on' : ''}" style="position:relative">📅 ${autre ? fr(f.date) : 'Autre date'}<input type="date" id="fdate" max="${today()}" value="${f.date}" style="position:absolute;inset:0;opacity:0"></label></div>
     <div class="lbl">Durée <span style="text-transform:none;letter-spacing:0">(facultatif)</span></div>
     <div class="chips wrap"><button class="chip ${!f.duree ? 'on' : ''}" data-act="f-duree" data-v="">—</button>${durees.map(d => `<button class="chip ${+f.duree === d ? 'on' : ''}" data-act="f-duree" data-v="${d}">${d} min</button>`).join('')}</div>
-    ${f.mode === 'fait' && t.freq ? `<div class="note">Prochain passage calculé : <b class="mono">${fr(edate(f.date, t.freq))}</b> (${esc(t.freqTxt || freqTxt(t.freq))})</div>` : ''}
+    ${f.mode === 'fait' && t.freq ? `<div class="note">Prochain passage calculé : <b class="mono">${fr(plusFreq(f.date, t.freq))}</b> (${esc(t.freqTxt || freqTxt(t.freq))})</div>` : ''}
     <button class="go" data-act="f-ok">${f.mode === 'maj' ? 'Enregistrer' : '✓ Enregistrer le passage'}</button>
     ${f.mode === 'maj' ? `<button class="go danger ${f.arm ? 'armed' : ''}" data-act="f-del">${f.arm ? 'Confirmer la suppression' : 'Supprimer ce passage'}</button>` : ''}`);
   const di = $('#fdate'); if (di) di.addEventListener('change', () => { if (di.value) { f.date = di.value > today() ? today() : di.value; rendreFait(); } });
@@ -875,6 +913,7 @@ function supprimerBien() {
   const f = S.form; if (!f.arm) { lireBienForm(); f.arm = true; rendreBienEdit(); return; }
   const b = S.d.inventaire.find(x => x.id === f.id); fermer(); if (!b) return;
   S.d.inventaire = S.d.inventaire.filter(x => x !== b);
+  if (!b.row) retirerEnAttente('bien', b.id);
   if (b.row) enfiler({ op: 'call', action: 'inv-del', payload: { row: b.row, attendu: { objet: b.srvObjet || b.objet } } });
   rendre(true); toast('Retiré de l\'inventaire');
 }
@@ -993,8 +1032,10 @@ function enregistrerContact() {
   fermer(); rendre(true); toast('Contact enregistré');
 }
 function supprimerContact() {
+  if (!S.form.arm) { S.form.arm = true; const b = document.querySelector('[data-act="c-del"]'); if (b) b.textContent = 'Toucher encore pour supprimer'; return; }   // 1.8 : confirmation
   const c = S.d.contacts.find(x => x.id === S.form.id); fermer(); if (!c) return;
   S.d.contacts = S.d.contacts.filter(x => x !== c);
+  if (!c.row) retirerEnAttente('contact', c.id);
   if (c.row) enfiler({ op: 'call', action: 'contact-del', payload: { row: c.row, attendu: c.srv || { pourquoi: c.pourquoi, nom: c.nom } } });
   rendre(true); toast('Contact supprimé');
 }
@@ -1406,6 +1447,7 @@ function supprimerConso() {
   if (!S.form.arm) { S.form.arm = true; const b = $('#k-del'); if (b) b.textContent = 'Toucher encore pour supprimer'; return; }
   const c = conso().find(x => x.id === S.form.id); if (!c) return ouvrirConso();
   S.d.consommables = conso().filter(x => x !== c);
+  if (!c.row) retirerEnAttente('conso', c.id);
   if (c.row) enfiler({ op: 'call', action: 'conso-del', payload: { row: c.row, attendu: c.srv || { article: c.article } } });
   ouvrirConso(); rendre(true); toast('Consommable supprimé');
 }
@@ -1666,7 +1708,7 @@ function verrouiller(msg) {
     try {
       const r = await api('data');
       if (!r.ok) { go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = r.message || 'Clé incorrecte'; return; }
-      LS.set('key', v); if (u) LS.set('url', u); S.queue = []; S.d = null; charger(r.data);
+      LS.set('key', v); if (u) LS.set('url', u); S.d = null; charger(r.data); if (S.queue.length) pomper();   // 1.8 : la file n'est plus effacée
       l.hidden = true; S.lastFetch = Date.now(); setSync('ok'); rendre();
     } catch (e) { go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = 'Connexion impossible. Vérifie l\'URL et ta connexion.'; }
   };
