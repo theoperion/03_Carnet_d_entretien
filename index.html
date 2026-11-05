@@ -1098,6 +1098,11 @@ function rendreExport() {
   if (f.dernier && !(st && st.etat === 'termine')) h += `<div class="lbl">Dernier dossier</div><div class="list"><a class="item tap" href="${esc(f.dernier.pdf)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="grow"><div class="ttl">${esc(f.dernier.ludo ? 'Ludothèque' : (f.dernier.pieces || []).length ? f.dernier.pieces.join(', ') : 'Inventaire complet')}</div><div class="desc">${f.dernier.ludo ? f.dernier.nbJeux + ' jeux · ' + e0(f.dernier.valeurJeux) : f.dernier.nbBiens + ' biens · ' + f.dernier.nbAnnexes + ' factures'} · ${ago(f.dernier.fin)}</div></div><span class="badge">PDF ›</span></a></div>`;
   $('#sheetIn').innerHTML = h;
 }
+// 1.8.4 : l'appli lance elle-même la passe d'export suivante (sans attendre le déclencheur Google, 1 à 2 min) ; on n'attend pas la réponse
+function lancerPasse() {
+  if (Date.now() - (S.expPasse || 0) < 10000) return; S.expPasse = Date.now();
+  fetch(apiUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'export-passe', key: S.key }), redirect: 'follow' }).catch(() => {});
+}
 async function suivreExport() {
   if (S.expPoll) return; S.expPoll = true;
   try {
@@ -1108,6 +1113,7 @@ async function suivreExport() {
       if (!r.ok) { S.form.charge = false; rendreExport(); if (r.error === 'ACTION') toast('Mets à jour le script (Export.gs)'); break; }
       S.expSt = S.form.st = r.statut; S.expDernier = S.form.dernier = r.dernier; S.form.charge = false; rendreExport();
       if (!r.statut || (r.statut.etat !== 'attente' && r.statut.etat !== 'en cours')) break;
+      if (r.passe === false) lancerPasse();   // personne ne travaille : on lance la passe suivante tout de suite
       await new Promise(ok => setTimeout(ok, 4000));
     }
   } finally { S.expPoll = false; }
@@ -1118,7 +1124,7 @@ async function lancerExport() {
     const r = await api('export', f.ludo ? { ludo: true } : { pieces: [...f.pieces], annexes: f.annexes, maif: f.maif });
     f.envoi = false;
     if (!r.ok && r.error !== 'EN_COURS') { toast(r.error === 'ACTION' ? 'Mets à jour le script (Export.gs)' : 'Échec : ' + r.message); rendreExport(); return; }
-    S.expSt = f.st = r.statut; rendreExport(); suivreExport();
+    S.expSt = f.st = r.statut; rendreExport(); S.expPasse = 0; lancerPasse(); suivreExport();
   } catch (e) { f.envoi = false; rendreExport(); toast('Connexion impossible'); }
 }
 

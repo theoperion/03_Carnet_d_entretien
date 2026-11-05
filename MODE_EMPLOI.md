@@ -34,7 +34,7 @@ Légende : ⬜ à faire · 🟡 proposé · 🔧 en cours · ✅ fait et vérifi
 - ✅ Étape 1 · **File d'attente hors connexion fiable** (appli 1.8) : une erreur n'efface plus les autres saisies (erreur passagère = réessai, refus = seule cette saisie est retirée, avec message) ; identifiant unique par envoi → plus de doublon après une coupure ; créé puis modifié = une seule écriture ; supprimé avant l'envoi = rien ne part ; les lignes suivent après une suppression ; délai maximal 30 s ; ressaisir la clé ne vide plus la file ; plus de passage « fantôme ». Testé avec un faux serveur.
 - ✅ Étape 2 · **Autres bugs** : mise à jour fiable (`version.js`, un seul numéro ; réseau d'abord) ; fréquences décimales bien comptées ; mail de test sans effet sur le rappel ; fond vert du thème Chantier ; confirmation avant de supprimer un contact ; chargement plus rapide.
 - ✅ Étape 3 · **Sécurité** (script 1.8) : plus d'action par l'adresse (clé hors URL) ; mauvaises clés freinées ; bibliothèque PDF de l'export vérifiée par empreinte avant exécution.
-- ✅ Étape 4 · **Export et ménage** : verrou au démarrage de l'export ; fonctions dangereuses de `Video.js` retirées (la galerie photos reste). Gros exports > 6 min : inchangé (on verra seulement si ça arrive).
+- ✅ Étape 4 · **Export et ménage** : verrou au démarrage de l'export ; fonctions dangereuses de `Video.js` retirées (la galerie photos reste). Gros exports : chaque étape est découpée en passes de 4 min 30 (limite Google 6 min).
 - **Numéro de version** : dans `version.js`, le seul endroit à changer.
 - ✅ 0.4 Numéro de version unique (`version.js`)
 - ✅ Étape 5 · **Mail une seule fois** (script 1.8.1) : plus de relance tous les 7 jours pour une tâche en retard.
@@ -48,3 +48,4 @@ Légende : ⬜ à faire · 🟡 proposé · 🔧 en cours · ✅ fait et vérifi
 | 05/11/2026 | 1–4 | Appli 1.8 et script 1.8 (version Google 16, 8 adresses) : toute la checklist corrigée sauf l'export > 6 min |
 | 05/11/2026 | 5 | Mail d'échéance envoyé une seule fois par tâche, sans relance (script 1.8.1, version Google 17, 8 adresses) |
 | 05/11/2026 | 6 | Appli 1.8.3 : le hors connexion n'efface plus celui de Versus ni du carnet de Carla |
+| 05/11/2026 | 7 | Export plus rapide (appli 1.8.4, Export 2.4, version Google 18) : l'appli lance elle-même chaque étape au lieu d'attendre Google (1 à 2 min d'attente par étape supprimées) ; anciennes adresses du script supprimées, une seule reste |
