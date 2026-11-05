@@ -47,3 +47,4 @@ Légende : ⬜ à faire · 🟡 proposé · 🔧 en cours · ✅ fait et vérifi
 | 05/11/2026 | 0.2–0.3, B1 | Audit ; 8 adresses alignées ; lien des e-mails corrigé (version Google 15) |
 | 05/11/2026 | 1–4 | Appli 1.8 et script 1.8 (version Google 16, 8 adresses) : toute la checklist corrigée sauf l'export > 6 min |
 | 05/11/2026 | 5 | Mail d'échéance envoyé une seule fois par tâche, sans relance (script 1.8.1, version Google 17, 8 adresses) |
+| 05/11/2026 | 6 | Appli 1.8.3 : le hors connexion n'efface plus celui de Versus ni du carnet de Carla |
