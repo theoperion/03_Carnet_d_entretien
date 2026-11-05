@@ -1681,7 +1681,7 @@ function ouvrirReglages() {
   S.form = { mode: 'reglages' };
   ouvrir(tete('Réglages') + `
     <div class="kv">
-      <div>Mail d'échéance</div><div>${sv.mailActif ? '✅ actif · chaque matin, seulement s\'il y a quelque chose à faire' : '⚠️ inactif : lance « installer » dans Apps Script'}</div>
+      <div>Mail d'échéance</div><div>${sv.mailActif ? '✅ actif · une seule fois par tâche, le matin de son échéance' : '⚠️ inactif : lance « installer » dans Apps Script'}</div>
       <div>Envoyé à</div><div>${esc(sv.destinataire || '—')}</div>
       <div>Dernier mail</div><div class="mono">${sv.dernierMail ? new Date(sv.dernierMail).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'aucun pour l\'instant'}</div>
       <div>Écritures</div><div>${S.queue.length ? S.queue.length + ' en attente d\'envoi' : 'tout est enregistré'}</div>
