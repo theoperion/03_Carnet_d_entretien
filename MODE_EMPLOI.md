@@ -49,3 +49,4 @@ Légende : ⬜ à faire · 🟡 proposé · 🔧 en cours · ✅ fait et vérifi
 | 05/11/2026 | 5 | Mail d'échéance envoyé une seule fois par tâche, sans relance (script 1.8.1, version Google 17, 8 adresses) |
 | 05/11/2026 | 6 | Appli 1.8.3 : le hors connexion n'efface plus celui de Versus ni du carnet de Carla |
 | 05/11/2026 | 7 | Export plus rapide (appli 1.8.4, Export 2.4, version Google 18) : l'appli lance elle-même chaque étape au lieu d'attendre Google (1 à 2 min d'attente par étape supprimées) ; anciennes adresses du script supprimées, une seule reste |
+| 06/11/2026 | 8 | Export 2.5 (version Google 19) : toute la ligne de l'index des annexes est cliquable ; « Ouvrir le PDF » ouvre le fichier lui-même (l'aperçu Google Drive ignore les liens internes « Annexe ») |
