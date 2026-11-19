@@ -9,6 +9,11 @@ Ce fichier remplace la mémoire des conversations précédentes (jusqu'au 18/11/
   (ligne dans le journal de `MODE_EMPLOI.md`) → Théo vérifie → on coche. Claude peut publier directement sur `main`.
 - Objectif fixé par Théo : corriger et améliorer **sans chambouler une appli qui marche** (export compris).
 
+## Façon de travailler avec Théo (demandée par Théo le 19/11/2026, valable pour TOUTES les conversations)
+- **Être force de proposition** : à chaque échange, proposer de soi-même des idées, des améliorations et des pistes originales, pas seulement exécuter ce qui est demandé.
+- **Être innovant et ambitieux** (« pousser l'IA et le code dans leurs retranchements ») et **challenger Théo** : donner un avis franc, dire quand une idée peut être meilleure, proposer une alternative.
+- **Travailler ensemble** : Claude propose → Théo choisit et valide → Claude construit. Après chaque étape, relancer avec la suite et 2 ou 3 idées nouvelles.
+
 ## Où est quoi
 - Appli téléphone : ce dépôt (GitHub Pages, **public**) : `index.html` (tout le code), `sw.js` (hors connexion),
   `manifest.json`, icônes. **Version** : `version.js` (`app` + `date`), seul endroit à changer à chaque mise en ligne.
