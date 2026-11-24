@@ -777,6 +777,7 @@ function lireTacheForm() {
   const z = $('#t-zone'); if (z) v.zone = z.value.trim();
 }
 function enregistrerTache() {
+  if (!S.form || S.form.mode !== 'tache') return;   // double appui : déjà enregistrée
   lireTacheForm(); const v = S.form.v;
   if (!v.zone) { $('#t-err').textContent = 'Choisis une zone (ou crée-en une)'; return; }
   const zc = z => norm(z).replace(/[^a-z0-9]/g, ''), zx = S.d.entretien.map(t => t.zone).find(z => z && zc(z) === zc(v.zone));
@@ -787,7 +788,8 @@ function enregistrerTache() {
   const t = Object.assign({ id: uid(), row: null, freqTxt: freqTxt(+v.freq), dernier: '', prochain: '', jours: null, etat: 'À PLANIFIER', pending: true }, champs);
   S.d.entretien.push(t); sauver();
   enfiler({ op: 'call', action: 'tache-save', payload: { tache: champs }, after: 'tache', id: t.id });
-  fermer(); S.fEt = 'TOUT'; rendre(true); toast('＋ « ' + v.element + ' » ajoutée au carnet');
+  fermer(); S.fEt = 'TOUT'; S.fZone = null; rendre(true); toast('＋ « ' + v.element + ' » ajoutée au carnet');
+  setTimeout(() => { const e = [...document.querySelectorAll('[data-act="tache"]')].find(x => x.dataset.el === t.element); if (e) e.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 80);   // 1.9.4 : on voit sa nouvelle tâche
 }
 
 /* ---------- HISTORIQUE ---------- */
@@ -998,7 +1000,7 @@ function rendreBienEdit() {
   const f = S.form, v = f.v, L = S.d.listes;
   ouvrir(tete(f.id ? 'Modifier le bien' : 'Ajouter un bien') + `
     <div class="lbl">Objet *</div><input class="field" id="b-objet" value="${esc(v.objet)}" placeholder="Ex. Canapé d'angle">
-    <div class="lbl">Pièce</div><div class="chips wrap">${L.pieces.concat(L.pieces.includes(v.piece) || !v.piece ? [] : [v.piece]).map(p => `<button class="chip ${v.piece === p ? 'on' : ''}" data-act="b-piece" data-p="${esc(p)}">${esc(p)}</button>`).join('')}${peutAjouter() ? '<button class="chip" data-act="b-piece-neuve">＋ Autre pièce</button>' : ''}</div>
+    <div class="lbl">Pièce</div><div class="chips wrap">${L.pieces.concat(L.pieces.includes(v.piece) || !v.piece ? [] : [v.piece]).map(p => `<button class="chip ${v.piece === p && !f.pieceNeuve ? 'on' : ''}" data-act="b-piece" data-p="${esc(p)}">${esc(p)}</button>`).join('')}${peutAjouter() ? `<button class="chip ${f.pieceNeuve ? 'on' : ''}" data-act="b-piece-neuve">＋ Autre pièce</button>` : ''}</div>
     ${f.pieceNeuve ? `<input class="field" id="b-piece-neuve" placeholder="Nom de la nouvelle pièce" maxlength="40" value="${esc(f.pieceTexte || '')}">` : ''}
     <div class="lbl">Catégorie</div><select class="field" id="b-categorie">${L.categories.concat(L.categories.includes(v.categorie) || !v.categorie || v.categorie === '__neuve' ? [] : [v.categorie]).map(c => `<option ${v.categorie === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}${peutAjouter() ? `<option value="__neuve" ${v.categorie === '__neuve' ? 'selected' : ''}>＋ Nouvelle catégorie…</option>` : ''}</select>
     <input class="field" id="b-categorie-neuve" placeholder="Nom de la nouvelle catégorie" maxlength="40" ${v.categorie === '__neuve' ? '' : 'hidden'}>
@@ -1024,7 +1026,8 @@ function enregistrerBien() {
   if (!v.objet) { $('#b-err').textContent = "Donne au moins un nom à l'objet"; return; }
   // 1.9.4 : nouvelle pièce / catégorie → ajoutée à la liste du Sheet AVANT le bien (même file d'attente, dans l'ordre)
   const pn = $('#b-piece-neuve'), cn = $('#b-categorie-neuve');
-  if (pn && pn.value.trim()) v.piece = pn.value.trim().slice(0, 40);
+  if (pn) { if (!pn.value.trim()) { $('#b-err').textContent = 'Donne un nom à la nouvelle pièce (ou choisis-en une)'; return; } v.piece = pn.value.trim().slice(0, 40); }
+  if (/^[=+\-@]/.test(v.piece) || /^[=+\-@]/.test(v.categorie === '__neuve' && cn ? cn.value.trim() : v.categorie)) { $('#b-err').textContent = 'Un nom ne peut pas commencer par = + - ou @'; return; }
   if (v.categorie === '__neuve') { v.categorie = cn ? cn.value.trim().slice(0, 40) : ''; if (!v.categorie) { $('#b-err').textContent = 'Donne un nom à la nouvelle catégorie'; return; } }
   const memeNom = (L, val) => L.find(x => norm(x).replace(/[^a-z0-9]/g, '') === norm(val).replace(/[^a-z0-9]/g, ''));   // « salon » = « Salon »
   [['pieces', 'piece'], ['categories', 'categorie']].forEach(([k, champ]) => {
@@ -1999,7 +2002,7 @@ function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai 
     try {
       const r = await api('data');
       if (!r.ok) { S.key = avant; go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = r.message || 'Clé incorrecte'; if (DEFAUT) $('#kaide').hidden = false; return; }
-      LS.set('key', v); S.d = null; charger(r.data); if (S.queue.length) pomper();   // 1.8 : la file n'est plus effacée
+      LS.set('key', v); charger(r.data); if (S.queue.length) pomper();   // 1.8 : la file n'est plus effacée ; 1.9.4 (carnet-code) : S.d gardé, sinon un passage ou une tâche en attente disparaissait
       l.hidden = true; S.lastFetch = Date.now(); setSync('ok'); rendre();
     } catch (e) { S.key = avant; go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = 'Connexion impossible. Vérifie ta connexion, ou le lien de ton carnet.'; }
   };
@@ -2057,7 +2060,7 @@ document.addEventListener('click', ev => {
     case 'bien': ouvrirBien(el.dataset.id); break;
     case 'bien-new': ouvrirBienEdit(null); break;
     case 'bien-edit': ouvrirBienEdit(S.form.id); break;
-    case 'b-piece': lireBienForm(); S.form.v.piece = el.dataset.p; rendreBienEdit(); break;
+    case 'b-piece': lireBienForm(); S.form.v.piece = el.dataset.p; S.form.pieceNeuve = false; S.form.pieceTexte = ''; rendreBienEdit(); break;   // 1.9.4 (carnet-utilisateur) : la pièce touchée gagne
     case 'b-gar': { lireBienForm(); const v = S.form.v; v.garantie = Math.max(0, Math.min(10, (+v.garantie || 0) + +el.dataset.d)); $('#b-gar').textContent = v.garantie + ' an' + (v.garantie > 1 ? 's' : ''); break; }
     case 'b-save': enregistrerBien(); break;
     case 'b-piece-neuve': lireBienForm(); S.form.pieceNeuve = true; rendreBienEdit(); setTimeout(() => { const e = $('#b-piece-neuve'); if (e) e.focus(); }, 50); break;
