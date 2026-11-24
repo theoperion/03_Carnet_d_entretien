@@ -1,40 +1,34 @@
-# Carnet T3 (carnet d'entretien + inventaire de l'appartement) — passation pour Claude
+# Carnet T3 — carnet d'entretien et inventaire de l'appartement
 
-À lire avant toute action, puis lire **`MODE_EMPLOI.md`** (le seul document de suivi : feuille de route, règles, journal).
-Ce fichier remplace la mémoire des conversations précédentes (jusqu'au 18/11/2026).
+Appli de Théo pour suivre l'entretien de son T3 (échéances, passages, mail d'échéance) et l'inventaire des biens (garanties, plafond MAIF, photos, consommables, jeux de société), avec un petit jeu de motivation (aquarium, trophées, séries, vacances). En ligne : https://theoperion.github.io/03_Carnet_d_entretien/
 
-## Qui, comment
-- **Théo** (GitHub `theoperion`), francophone : répondre **en français**, simplement, sans jargon.
-- **Méthode** : Claude propose une étape → Théo valide (« OK étape X ») → Claude fait, teste, met en ligne
-  (ligne dans le journal de `MODE_EMPLOI.md`) → Théo vérifie → on coche. Claude peut publier directement sur `main`.
-- Objectif fixé par Théo : corriger et améliorer **sans chambouler une appli qui marche** (export compris).
+**Ce dépôt est public.** Les agents et les idées sont dans le dépôt **privé** `app_scripts` (`.claude/agents/carnet-*.md`, `carnet-t3/IDEES.md`). Anciennes fiches : `archives/`. Journal des versions : `MODE_EMPLOI.md`.
 
-## Façon de travailler avec Théo (demandée par Théo le 19/11/2026, valable pour TOUTES les conversations)
-- **Être force de proposition** : à chaque échange, proposer de soi-même des idées, des améliorations et des pistes originales, pas seulement exécuter ce qui est demandé.
-- **Être innovant et ambitieux** (« pousser l'IA et le code dans leurs retranchements ») et **challenger Théo** : donner un avis franc, dire quand une idée peut être meilleure, proposer une alternative.
-- **Travailler ensemble** : Claude propose → Théo choisit et valide → Claude construit. Après chaque étape, relancer avec la suite et 2 ou 3 idées nouvelles.
+## Règles de travail
+- Tout en français, simplement. Claude propose → Théo valide (« OK … ») → Claude fait, teste, met en ligne, ajoute une ligne au journal → Théo vérifie.
+- Objectif : améliorer **sans chambouler une appli qui marche** (export compris).
+- Aucun identifiant, jeton, adresse e-mail ni ID de Sheet/Drive dans ce dépôt (l'adresse du script dans `index.html` est publique par nature).
 
 ## Où est quoi
-- Appli téléphone : ce dépôt (GitHub Pages, **public**) : `index.html` (tout le code), `sw.js` (hors connexion),
-  `manifest.json`, icônes. **Version** : `version.js` (`app` + `date`), seul endroit à changer à chaque mise en ligne.
-- Script Google (API, mails d'échéance, export PDF) : dépôt **privé** `theoperion/app_scripts`, dossier `carnet-t3/`
-  (`Code.js`, `Export.js`, `Video.js`). Audit de référence : `app_scripts/audits/carnet-t3-2026-11.md`.
-- Données : Google Sheet « Appartement T3 · Carnet & inventaire » (sur le compte Google de Théo).
+- Appli (GitHub Pages) : `index.html` (tout le code, mode d'emploi intégré `ouvrirAide`), `sw.js` (hors connexion), `manifest.json`, icônes.
+- **Version** : `version.js` (`app` + `date`), seul endroit à changer à chaque mise en ligne (renouvelle aussi le cache).
+- Script Google (API, mails, export PDF) : `app_scripts/carnet-t3/` (`Code.js`, `Export.js`, `Video.js`).
+- Données : Google Sheet « Appartement T3 · Carnet & inventaire » (Entretien, Historique, Inventaire, Contacts, Jeux de société, Consommables…).
 
-## Mettre le script en ligne (sans changer d'adresse)
-- Une fois par machine : `npx -y @google/clasp@3.4.1 login` (compte Google de Théo ; rien de secret dans GitHub).
-- Dans `app_scripts/carnet-t3` : `clasp push --force` puis `python3 ../outils/deployer.py "Carnet 1.x : ce qui change"`.
-- **Jamais « Nouveau déploiement »** dans l'éditeur Apps Script (créerait une nouvelle adresse) ; jamais de copier-coller dans l'éditeur.
-- `app_scripts` est partagé avec d'autres conversations : `git pull --rebase` avant de pousser.
+## Mettre en ligne
+- **Appli** : changer `version.js`, publier sur `main` (autorisé par Théo le 05/11/2026), dire ce qui est publié.
+- **Script** (même adresse) : une fois par machine `npx -y @google/clasp@3.4.1 login` (compte de Théo) ; dans `app_scripts/carnet-t3` : `clasp push --force` puis `python3 ../outils/deployer.py "Carnet 1.x : ce qui change"`. **Jamais « Nouveau déploiement »**, jamais de copier-coller dans l'éditeur. `git pull --rebase` avant de pousser `app_scripts` (partagé).
 
-## Règles
-- **Mails d'échéance : un seul par tâche et par échéance, jamais de relance** (la tâche reste dans l'appli jusqu'à « FAIT »).
-- Aucun identifiant / jeton / adresse e-mail dans ce dépôt public.
-- Le hors connexion ne doit effacer que ses propres caches (Versus et le carnet de Carla sont sur le même domaine).
-- Bouton retour du téléphone (1.8.5) : ferme la fenêtre ouverte, puis revient au tableau de bord, puis quitte. Validé, ne pas casser.
-- Tester avant de publier : `python3 -m http.server` + Playwright (Chromium), avec un **faux serveur** (intercepter
-  `https://script.google.com/**`), jamais les vraies données ; Théo utilise Firefox Android, ça doit aussi marcher sur Chrome et iPhone.
+## Règles à ne pas casser
+- **Mail d'échéance : un seul par tâche et par échéance, jamais de relance** (la tâche reste dans l'appli jusqu'à « FAIT ») ; garanties et plafond MAIF : une fois aussi ; le mail de test ne touche à rien.
+- **File hors connexion** (1.8) : aucune saisie perdue ni doublée (identifiant par envoi, fusion créer/modifier, délai 30 s, erreur passagère = réessai).
+- Le hors connexion n'efface que ses caches `carnet-t3-…` (Versus et le carnet de Carla sont sur le même domaine).
+- Bouton retour du téléphone : ferme la fenêtre ouverte → tableau de bord → quitte.
+- Tester avant de publier : `python3 -m http.server` + Playwright (Chromium) avec un **faux serveur** (intercepter `https://script.google.com/**`), jamais les vraies données. Théo est sur Firefox Android ; ça doit aussi marcher sur Chrome et iPhone.
 
-## État au 18/11/2026
-Appli 1.8.5, Export 2.5. Tout l'audit de novembre est corrigé (voir `MODE_EMPLOI.md`). Pas de chantier en cours :
-demander à Théo ce qu'il veut faire ensuite.
+## Agents (dans `app_scripts/.claude/agents/`, lecture seule)
+4 agents, chacun répond ✅ / ⚠ / « non concerné » avec preuve : **`carnet-syndic`** (expert du logement : échéances, mails, inventaire, jeu de motivation) · **`carnet-code`** (file hors connexion, version, caches, appli ↔ script, sécurité, export) · **`carnet-utilisateur`** (Théo sur son téléphone, captures à 390 px) · **`carnet-avocat`** (gros changement ou nouvelle idée).
+Qui relit quoi : texte ou petit affichage → personne ; nouvel écran/geste → utilisateur ; calcul, échéance, mail → syndic + code ; données, envois, mise en ligne du script → code ; gros changement → les 4. À chaque version, dire à Théo quels agents ont relu et pourquoi.
+
+## État au 24/11/2026
+Appli 1.8.5, script 1.8.2, Export 2.5. Audit de novembre entièrement corrigé. Pas de chantier en cours.
