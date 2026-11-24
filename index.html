@@ -597,6 +597,7 @@ async function pomper() {
   const op = S.queue[0];
   if (!op) { setSync('ok'); setTimeout(() => rafraichir(true), 1200); return; }
   S.busy = true; setSync('sync');
+  if (!op.tente) { op.tente = true; sauver(); }   // 1.9.5 (carnet-code) : une opération déjà tentée ne se corrige plus en place
   let res;
   try {
     if (op.op === 'fait') {
@@ -622,6 +623,7 @@ async function pomper() {
         const liste = { bien: S.d.inventaire, contact: S.d.contacts, conso: S.d.consommables || [] }[op.after], o = liste && liste.find(x => x.id === op.id);
         if (o && o.row) { op.payload.row = o.row; if (op.after === 'bien') op.payload.attendu = { objet: o.srvObjet || o.objet }; else if (o.srv) op.payload.attendu = o.srv; }
       }
+      if (op.action === 'tache-maj' && !op.payload.row) { const t = S.d.entretien.find(x => x.id === op.id); op.payload.row = t && t.row; }   // 1.9.5 : ligne connue après la création
       res = await api(op.action, op.payload, op.uid);
       if (res.ok && op.after) apresAppel(op, res);
       if (res.ok && res.ligneSupprimee) decalerLignes('inv', res.ligneSupprimee);
@@ -647,7 +649,11 @@ async function pomper() {
   sauver(); rendre(true); pomper();
 }
 function apresAppel(op, res) {
-  if (op.after === 'tache') { const t = S.d.entretien.find(x => x.id === op.id); if (t) { if (res.tache) Object.assign(t, res.tache); t.pending = false; t.srvEl = t.element; } }
+  if (op.after === 'tache') {
+    const t = S.d.entretien.find(x => x.id === op.id), encore = S.queue.some(o => o !== op && o.after === 'tache' && o.id === op.id);
+    if (res.row) S.queue.forEach(o => { if (o !== op && o.id === op.id && o.payload && !o.payload.row) o.payload.row = res.row; });   // modification / suppression faites avant la confirmation
+    if (t) { if (res.row) t.row = res.row; if (!encore) { if (res.tache) Object.assign(t, res.tache); t.pending = false; t.srvEl = t.element; } }   // une modification suivante attend : on garde l'écran tel quel
+  }
   if (op.after === 'bien') {
     const b = S.d.inventaire.find(x => x.id === op.id);
     if (b && res.bien) Object.assign(b, res.bien, { pending: false });
@@ -788,14 +794,13 @@ function lireTacheForm() {
   const z = $('#t-zone'); if (z) v.zone = z.value.trim();
 }
 function modifierTache(t, champs) {
-  const creation = S.queue.findIndex(o => o.action === 'tache-save' && o.id === t.id);
-  if (creation === 0 && S.busy) { $('#t-err').textContent = 'Envoi en cours : réessaie dans un instant'; return; }
-  if (!t.row && creation < 0) { $('#t-err').textContent = 'Envoi en cours : réessaie dans un instant'; return; }
-  const avant = t.srvEl || t.element, ancien = t.element;
+  const creation = S.queue.findIndex(o => o.action === 'tache-save' && o.id === t.id), tentee = creation >= 0 && S.queue[creation].tente;
+  if (!t.row && creation < 0 && !S.queue.some(o => o.action === 'tache-maj' && o.id === t.id)) { $('#t-err').textContent = 'Cette tâche est en cours d\'envoi : réessaie dans un instant'; return; }
+  const avant = t.srvEl || (creation >= 0 ? S.queue[creation].payload.tache.element : t.element), ancien = t.element;
   if (champs.element !== ancien) S.d.historique.forEach(h => { if (h.element === ancien) { h.element = champs.element; if (h.srv) h.srv.element = champs.element; } });   // le script renomme aussi ses passages
   Object.assign(t, champs, { freqTxt: freqTxt(champs.freq), pending: true });
   if (t.dernier) recalc(t);
-  if (creation >= 0) S.queue[creation].payload.tache = champs;   // pas encore envoyée : on corrige la création
+  if (creation >= 0 && !tentee) S.queue[creation].payload.tache = champs;   // jamais tentée : on corrige la création
   else { enfiler({ op: 'call', action: 'tache-maj', payload: { row: t.row, attendu: { element: avant }, tache: champs }, after: 'tache', id: t.id }); t.srvEl = champs.element; }
   sauver(); fermer(); rendre(true); toast('Tâche modifiée');
 }
@@ -807,10 +812,10 @@ function supprimerTache() {
   }
   if (Date.now() - (f.armAt || 0) < 600) return;   // double appui trop rapide : ignoré
   const t = S.d.entretien.find(x => x.id === f.edit); if (!t) return fermer();
-  const creation = S.queue.findIndex(o => o.action === 'tache-save' && o.id === t.id);
-  if ((creation === 0 && S.busy) || (!t.row && creation < 0)) { $('#t-err').textContent = 'Envoi en cours : réessaie dans un instant'; return; }
-  if (creation >= 0) retirerEnAttente('tache', t.id);
-  else enfiler({ op: 'call', action: 'tache-del', payload: { row: t.row, attendu: { element: t.srvEl || t.element } } });
+  const creation = S.queue.findIndex(o => o.action === 'tache-save' && o.id === t.id), tentee = creation >= 0 && S.queue[creation].tente;
+  if (!t.row && creation < 0 && !S.queue.some(o => o.after === 'tache' && o.id === t.id)) { $('#t-err').textContent = 'Cette tâche est en cours d\'envoi : réessaie dans un instant'; return; }
+  if (creation >= 0 && !tentee) retirerEnAttente('tache', t.id);   // jamais tentée : on l'annule simplement
+  else enfiler({ op: 'call', action: 'tache-del', id: t.id, payload: { row: t.row || null, attendu: { element: t.srvEl || (creation >= 0 ? S.queue[creation].payload.tache.element : t.element) } } });
   S.d.entretien = S.d.entretien.filter(x => x !== t); sauver(); fermer(); rendre(true); toast('Tâche supprimée');
 }
 function enregistrerTache() {
