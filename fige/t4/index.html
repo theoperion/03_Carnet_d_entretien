@@ -547,9 +547,13 @@ function charger(d) {
   nettoyer(d);
   // conserve les passages locaux pas encore envoyés
   const enFile = new Set(S.queue.filter(o => o.op === 'fait').map(o => o.id || (o.h && o.h.id)));
+  const anciennes = S.d ? S.d.entretien : null;
   const loc = S.d ? S.d.historique.filter(x => x.pending && !x.row && enFile.has(x.id)) : [];   // 1.8 : plus de passage « fantôme » resté en « envoi… »
   S.d = d; S.d.historique = d.historique.concat(loc.filter(l => !d.historique.some(h => h.row && h.element === l.element && h.date === l.date && !l.row)));
   if (loc.length) S.d.entretien.forEach(recalc);
+  // 1.9.4 : une tâche ajoutée mais pas encore envoyée reste affichée
+  const tEnFile = new Set(S.queue.filter(o => o.after === 'tache').map(o => o.id));
+  (anciennes || []).filter(t => t.pending && !t.row && tEnFile.has(t.id) && !S.d.entretien.some(x => norm(x.element) === norm(t.element))).forEach(t => S.d.entretien.push(t));
   rafraichirEtats(); sauver(); retenirCarnet();
 }
 async function rafraichir(force) {
@@ -643,6 +647,7 @@ async function pomper() {
   sauver(); rendre(true); pomper();
 }
 function apresAppel(op, res) {
+  if (op.after === 'tache') { const t = S.d.entretien.find(x => x.id === op.id); if (t && res.tache) Object.assign(t, res.tache, { pending: false }); }
   if (op.after === 'bien') {
     const b = S.d.inventaire.find(x => x.id === op.id);
     if (b && res.bien) Object.assign(b, res.bien, { pending: false });
@@ -736,12 +741,51 @@ function vEntretien() {
   h += `<div class="chips"><button class="chip ${!S.fZone ? 'on' : ''}" data-act="fzone" data-z="">Toutes</button>${zones.map(z => `<button class="chip ${S.fZone === z ? 'on' : ''}" data-act="fzone" data-z="${esc(z)}">${esc(z)}</button>`).join('')}</div>`;
   h += `<div class="rowline" style="justify-content:flex-end;margin:4px 0 8px;gap:6px"><span class="muted" style="font-size:12px">Trier :</span><button class="chip ${S.vue === 'urgence' ? 'on' : ''}" data-act="vue" data-v="urgence">Urgence</button><button class="chip ${S.vue === 'zone' ? 'on' : ''}" data-act="vue" data-v="zone">Zone</button></div>`;
   let L = E.filter(t => (S.fEt === 'TOUT' || t.etat === S.fEt) && (!S.fZone || t.zone === S.fZone));
-  if (!L.length) return h + '<div class="list"><div class="empty">Aucune tâche ici 👌</div></div>';
+  const ajout = peutAjouter() ? '<button class="go sec2" data-act="tache-new" style="margin-top:12px">＋ Ajouter une tâche</button>' : '';
+  if (!L.length) return h + '<div class="list"><div class="empty">Aucune tâche ici 👌</div></div>' + ajout;
   if (S.vue === 'zone') {
     const g = {}; L.forEach(t => (g[t.zone] = g[t.zone] || []).push(t));
     Object.keys(g).forEach(z => h += `<div class="month"><span>${esc(z)}</span><span>${g[z].length}</span></div><div class="list">${g[z].sort(ordreUrg).map(t => ligneTache(t)).join('')}</div>`);
   } else h += `<div class="list">${L.sort(ordreUrg).map(t => ligneTache(t)).join('')}</div>`;
-  return h;
+  return h + ajout;
+}
+
+/* ---------- 1.9.4 : ajouter une tâche d'entretien, une pièce, une catégorie (script 2.0 : serveur.ajouts) ---------- */
+const peutAjouter = () => ESSAI || !!(S.d && S.d.serveur && S.d.serveur.ajouts);
+const FREQS = [1, 2, 3, 4, 6, 12, 24];
+function ouvrirTacheNew() {
+  S.form = { mode: 'tache', v: { zone: S.fZone || '', element: '', intervention: '', freq: 6, outils: '' }, zoneNeuve: false };
+  rendreTacheNew();
+}
+function rendreTacheNew() {
+  const f = S.form, v = f.v, zones = [...new Set(S.d.entretien.map(t => t.zone).filter(Boolean))];
+  if (!zones.length) f.zoneNeuve = true;
+  ouvrir(tete('Ajouter une tâche') + `
+    <div class="lbl">Zone</div><div class="chips wrap">${zones.map(z => `<button class="chip ${!f.zoneNeuve && v.zone === z ? 'on' : ''}" data-act="t-zone" data-z="${esc(z)}">${esc(z)}</button>`).join('')}
+      <button class="chip ${f.zoneNeuve ? 'on' : ''}" data-act="t-zone-neuve">＋ Nouvelle zone</button></div>
+    ${f.zoneNeuve ? `<input class="field" id="t-zone" value="${esc(v.zone)}" placeholder="Ex. Jardin" maxlength="40">` : ''}
+    <div class="lbl">Élément *</div><input class="field" id="t-element" value="${esc(v.element)}" placeholder="Ex. Chaudière" maxlength="80">
+    <div class="lbl">Ce qu'il faut faire</div><textarea class="field" id="t-intervention" placeholder="Ex. Faire l'entretien annuel" maxlength="300">${esc(v.intervention)}</textarea>
+    <div class="lbl">Tous les…</div><div class="chips wrap">${FREQS.map(n => `<button class="chip ${+v.freq === n ? 'on' : ''}" data-act="t-freq" data-v="${n}">${n === 12 ? '1 an' : n === 24 ? '2 ans' : n + ' mois'}</button>`).join('')}</div>
+    <div class="lbl">Outillage & produits <span style="text-transform:none;letter-spacing:0">(facultatif)</span></div><input class="field" id="t-outils" value="${esc(v.outils)}" maxlength="200">
+    <div class="note">Elle apparaîtra en « Jamais faite » : note son premier passage avec FAIT, la prochaine date se calculera seule.</div>
+    <div class="err" id="t-err"></div>
+    <button class="go" data-act="t-save">＋ Ajouter la tâche</button>`);
+}
+function lireTacheForm() {
+  const v = S.form.v; ['element', 'intervention', 'outils'].forEach(k => { const e = $('#t-' + k); if (e) v[k] = e.value.trim(); });
+  const z = $('#t-zone'); if (z) v.zone = z.value.trim();
+}
+function enregistrerTache() {
+  lireTacheForm(); const v = S.form.v;
+  if (!v.zone) { $('#t-err').textContent = 'Choisis une zone (ou crée-en une)'; return; }
+  if (!v.element) { $('#t-err').textContent = "Donne un nom à l'élément"; return; }
+  if (S.d.entretien.some(t => norm(t.element) === norm(v.element))) { $('#t-err').textContent = 'Cette tâche existe déjà dans le carnet'; return; }
+  const champs = { zone: v.zone, element: v.element, intervention: v.intervention, freq: +v.freq, outils: v.outils };
+  const t = Object.assign({ id: uid(), row: null, freqTxt: freqTxt(+v.freq), dernier: '', prochain: '', jours: null, etat: 'À PLANIFIER', pending: true }, champs);
+  S.d.entretien.push(t); sauver();
+  enfiler({ op: 'call', action: 'tache-save', payload: { tache: champs }, after: 'tache', id: t.id });
+  fermer(); S.fEt = 'TOUT'; rendre(true); toast('＋ « ' + v.element + ' » ajoutée au carnet');
 }
 
 /* ---------- HISTORIQUE ---------- */
@@ -952,8 +996,10 @@ function rendreBienEdit() {
   const f = S.form, v = f.v, L = S.d.listes;
   ouvrir(tete(f.id ? 'Modifier le bien' : 'Ajouter un bien') + `
     <div class="lbl">Objet *</div><input class="field" id="b-objet" value="${esc(v.objet)}" placeholder="Ex. Canapé d'angle">
-    <div class="lbl">Pièce</div><div class="chips wrap">${L.pieces.map(p => `<button class="chip ${v.piece === p ? 'on' : ''}" data-act="b-piece" data-p="${esc(p)}">${esc(p)}</button>`).join('')}</div>
-    <div class="lbl">Catégorie</div><select class="field" id="b-categorie">${L.categories.map(c => `<option ${v.categorie === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+    <div class="lbl">Pièce</div><div class="chips wrap">${L.pieces.concat(L.pieces.includes(v.piece) || !v.piece ? [] : [v.piece]).map(p => `<button class="chip ${v.piece === p ? 'on' : ''}" data-act="b-piece" data-p="${esc(p)}">${esc(p)}</button>`).join('')}${peutAjouter() ? '<button class="chip" data-act="b-piece-neuve">＋ Autre pièce</button>' : ''}</div>
+    ${f.pieceNeuve ? `<input class="field" id="b-piece-neuve" placeholder="Nom de la nouvelle pièce" maxlength="40" value="${esc(f.pieceTexte || '')}">` : ''}
+    <div class="lbl">Catégorie</div><select class="field" id="b-categorie">${L.categories.concat(L.categories.includes(v.categorie) || !v.categorie || v.categorie === '__neuve' ? [] : [v.categorie]).map(c => `<option ${v.categorie === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}${peutAjouter() ? `<option value="__neuve" ${v.categorie === '__neuve' ? 'selected' : ''}>＋ Nouvelle catégorie…</option>` : ''}</select>
+    <input class="field" id="b-categorie-neuve" placeholder="Nom de la nouvelle catégorie" maxlength="40" ${v.categorie === '__neuve' ? '' : 'hidden'}>
     <div class="lbl">Marque / modèle</div><input class="field" id="b-marque" value="${esc(v.marque)}">
     <div class="grid2"><div><div class="lbl">Prix TTC (€)</div><input class="field mono" id="b-prix" inputmode="decimal" value="${v.prix === '' ? '' : String(v.prix).replace('.', ',')}" ${v.prixAuto ? 'readonly style="opacity:.55"' : ''}>${v.prixAuto ? '<div class="muted" style="font-size:11.5px;margin-top:3px">Calculé dans le Sheet : non modifiable ici</div>' : ''}</div>
       <div><div class="lbl">Date d'achat</div><input class="field mono" id="b-date" type="date" value="${esc(v.date)}"></div></div>
@@ -964,14 +1010,24 @@ function rendreBienEdit() {
     <div class="err" id="b-err"></div>
     <button class="go" data-act="b-save">Enregistrer</button>
     ${f.id ? `<button class="go danger ${f.arm ? 'armed' : ''}" data-act="b-del">${f.arm ? 'Confirmer : retirer de l\'inventaire' : 'Retirer de l\'inventaire'}</button>` : ''}`);
+  const sc = $('#b-categorie'); if (sc) sc.addEventListener('change', () => { const n = $('#b-categorie-neuve'); n.hidden = sc.value !== '__neuve'; if (!n.hidden) n.focus(); });
 }
 function lireBienForm() {
+  const pn = $('#b-piece-neuve'); if (pn) S.form.pieceTexte = pn.value;
   const v = S.form.v;['objet', 'marque', 'magasin', 'serie', 'remarque', 'date', 'categorie'].forEach(k => { const e = $('#b-' + k); if (e) v[k] = e.value.trim(); });
   const p = $('#b-prix'); if (p && !v.prixAuto) { const n = Number(p.value.replace(/\s/g, '').replace(',', '.')); v.prix = p.value.trim() === '' || isNaN(n) ? '' : n; }
 }
 function enregistrerBien() {
   lireBienForm(); const f = S.form, v = f.v;
   if (!v.objet) { $('#b-err').textContent = "Donne au moins un nom à l'objet"; return; }
+  // 1.9.4 : nouvelle pièce / catégorie → ajoutée à la liste du Sheet AVANT le bien (même file d'attente, dans l'ordre)
+  const pn = $('#b-piece-neuve'), cn = $('#b-categorie-neuve');
+  if (pn && pn.value.trim()) v.piece = pn.value.trim().slice(0, 40);
+  if (v.categorie === '__neuve') { v.categorie = cn ? cn.value.trim().slice(0, 40) : ''; if (!v.categorie) { $('#b-err').textContent = 'Donne un nom à la nouvelle catégorie'; return; } }
+  [['pieces', v.piece], ['categories', v.categorie]].forEach(([k, val]) => {
+    const L = S.d.listes[k] = S.d.listes[k] || [];
+    if (val && !L.some(x => norm(x) === norm(val))) { L.push(val); enfiler({ op: 'call', action: 'liste-ajout', payload: { liste: k, valeur: val } }); }
+  });
   const champs = { piece: v.piece, categorie: v.categorie, objet: v.objet, marque: v.marque, serie: v.serie, magasin: v.magasin, date: v.date, prix: v.prix, garantie: v.garantie, remarque: v.remarque };
   let b;
   if (f.id) {
@@ -1754,10 +1810,11 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
     ['🚦 Les états', '<b>En retard</b> dès le lendemain de la date prévue · <b>Sous 30 jours</b> : à caler dans l\'agenda · <b>RAS</b> : rien à signaler · <b>Jamais faites</b> : à planifier une 1re fois.'],
     ['✉️ Le mail', 'Le matin où une tâche arrive à échéance, un mail part, <b>une seule fois</b> : jamais de relance. La tâche reste en retard dans l\'appli jusqu\'à « C\'est fait ».'],
     ['📒 Historique', 'Tous les passages notés. Touche un passage pour corriger sa date ou sa durée, ou le supprimer (il faut toucher deux fois).'],
+    peutAjouter() && ['＋ Nouvelle tâche', 'En bas de l\'onglet Entretien : « Ajouter une tâche » (zone, élément, ce qu\'il faut faire, fréquence en mois). Elle arrive en « Jamais faite » ; note son premier passage avec FAIT.'],
     mod('consommables') && ['🧴 Consommables', 'Dans l\'onglet Entretien : les produits d\'entretien et ce qu\'il reste à racheter.']
   ]);
   if (inv) h += bloc('L\'inventaire', [
-    ['🛋️ Les biens', 'Chaque objet de l\'appartement avec sa pièce, son prix, sa facture et ses photos. Cherche par objet, marque ou magasin.'],
+    ['🛋️ Les biens', 'Chaque objet de l\'appartement avec sa pièce, son prix, sa facture et ses photos. Cherche par objet, marque ou magasin. Une pièce ou une catégorie manque ? « ＋ Autre pièce » ou « ＋ Nouvelle catégorie » dans la fiche.'],
     ['🛡 Garanties', 'Une alerte apparaît quand une garantie finit dans moins de 30 jours, et un mail part une seule fois : teste l\'appareil à fond avant la fin.'],
     (EST_T3 || (S.d && S.d.plafond)) && ['📊 Plafond ' + AS_DE, 'La jauge compare la valeur du mobilier (hors travaux) au plafond assuré. À 95 %, un mail te prévient d\'en demander le relèvement.'],
     EST_T3 && ['📄 Dossier assurance', 'Coche les biens importants (« Ajouter au dossier MAIF »), puis « Dossier pour l\'assurance » : un PDF et un Word avec fiches, photos et factures. Il se fabrique en arrière-plan, un mail arrive avec les liens.']
@@ -1850,6 +1907,8 @@ function apiEssai(action, x) {
   const non = { ok: false, error: 'ESSAI', message: 'Pas disponible dans le carnet d\'essai' };
   if (action === 'data') { const c = LS.get('cache', null); return { ok: true, data: c ? JSON.parse(JSON.stringify(c)) : donneesEssai() }; }
   if (action === 'photos-liste') return { ok: true, total: 0, photos: [] };
+  if (action === 'liste-ajout') return { ok: true };
+  if (action === 'tache-save') { const r = LS.get('essaiRow', 500) + 1; LS.set('essaiRow', r); return { ok: true, row: r, tache: Object.assign({}, x.tache, { row: r, dernier: '', prochain: '', jours: null, etat: 'À PLANIFIER', freqTxt: freqTxt(x.tache.freq) }) }; }
   if (action === 'export-statut') return { ok: true, statut: null, dernier: null };
   if (/^(export|photo|mail-test)/.test(action)) return non;
   const r = LS.get('essaiRow', 500) + 1; LS.set('essaiRow', r);
@@ -1994,6 +2053,12 @@ document.addEventListener('click', ev => {
     case 'b-piece': lireBienForm(); S.form.v.piece = el.dataset.p; rendreBienEdit(); break;
     case 'b-gar': { lireBienForm(); const v = S.form.v; v.garantie = Math.max(0, Math.min(10, (+v.garantie || 0) + +el.dataset.d)); $('#b-gar').textContent = v.garantie + ' an' + (v.garantie > 1 ? 's' : ''); break; }
     case 'b-save': enregistrerBien(); break;
+    case 'b-piece-neuve': lireBienForm(); S.form.pieceNeuve = true; rendreBienEdit(); setTimeout(() => { const e = $('#b-piece-neuve'); if (e) e.focus(); }, 50); break;
+    case 'tache-new': ouvrirTacheNew(); break;
+    case 't-zone': lireTacheForm(); S.form.zoneNeuve = false; S.form.v.zone = el.dataset.z; rendreTacheNew(); break;
+    case 't-zone-neuve': lireTacheForm(); S.form.zoneNeuve = true; S.form.v.zone = ''; rendreTacheNew(); setTimeout(() => { const e = $('#t-zone'); if (e) e.focus(); }, 50); break;
+    case 't-freq': lireTacheForm(); S.form.v.freq = +el.dataset.v; rendreTacheNew(); break;
+    case 't-save': enregistrerTache(); break;
     case 'b-del': supprimerBien(); break;
     case 'photo': $('#fileIn').value = ''; $('#fileIn').click(); break;
     case 'photo-gal': $('#galIn').value = ''; $('#galIn').click(); break;
