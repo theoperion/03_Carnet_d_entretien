@@ -647,7 +647,7 @@ async function pomper() {
   sauver(); rendre(true); pomper();
 }
 function apresAppel(op, res) {
-  if (op.after === 'tache') { const t = S.d.entretien.find(x => x.id === op.id); if (t && res.tache) Object.assign(t, res.tache, { pending: false }); }
+  if (op.after === 'tache') { const t = S.d.entretien.find(x => x.id === op.id); if (t) { if (res.tache) Object.assign(t, res.tache); t.pending = false; t.srvEl = t.element; } }
   if (op.after === 'bien') {
     const b = S.d.inventaire.find(x => x.id === op.id);
     if (b && res.bien) Object.assign(b, res.bien, { pending: false });
@@ -757,24 +757,53 @@ function ouvrirTacheNew() {
   S.form = { mode: 'tache', v: { zone: S.fZone || '', element: '', intervention: '', freq: 6, outils: '' }, zoneNeuve: false };
   rendreTacheNew();
 }
+const dejaFaite = el => histo().some(h => norm(h.element) === norm(el));
+function ouvrirTacheEdit(el) {   // 1.9.5 : modifier / supprimer une tâche (nom et suppression seulement si aucun passage)
+  const t = S.d.entretien.find(x => x.element === el); if (!t) return;
+  S.form = { mode: 'tache', edit: t.id, v: { zone: t.zone, element: t.element, intervention: t.intervention || '', freq: t.freq || 6, outils: t.outils || '' }, zoneNeuve: false, nomFige: dejaFaite(t.element) };
+  rendreTacheNew();
+}
 function rendreTacheNew() {
   const f = S.form, v = f.v, zones = [...new Set(S.d.entretien.map(t => t.zone).filter(Boolean))];
   if (!zones.length) f.zoneNeuve = true;
-  ouvrir(tete('Ajouter une tâche') + `
+  ouvrir(tete(f.edit ? 'Modifier la tâche' : 'Ajouter une tâche') + `
     <div class="lbl">Zone</div><div class="chips wrap">${zones.map(z => `<button class="chip ${!f.zoneNeuve && v.zone === z ? 'on' : ''}" data-act="t-zone" data-z="${esc(z)}">${esc(z)}</button>`).join('')}
       <button class="chip ${f.zoneNeuve ? 'on' : ''}" data-act="t-zone-neuve">＋ Nouvelle zone</button></div>
     ${f.zoneNeuve ? `<input class="field" id="t-zone" value="${esc(v.zone)}" placeholder="Ex. Jardin" maxlength="40">` : ''}
-    <div class="lbl">Élément *</div><input class="field" id="t-element" value="${esc(v.element)}" placeholder="Ex. Chaudière" maxlength="80">
+    <div class="lbl">Élément *</div><input class="field" id="t-element" value="${esc(v.element)}" placeholder="Ex. Chaudière" maxlength="80" ${f.nomFige ? 'readonly style="opacity:.6"' : ''}>
+    ${f.nomFige ? '<div class="muted" style="font-size:12px;margin-top:3px">Des passages sont notés : le nom reste le même (l\'historique y est rattaché).</div>' : ''}
     <div class="lbl">Ce qu'il faut faire</div><textarea class="field" id="t-intervention" placeholder="Ex. Faire l'entretien annuel" maxlength="300">${esc(v.intervention)}</textarea>
     <div class="lbl">Tous les…</div><div class="chips wrap">${FREQS.map(n => `<button class="chip ${+v.freq === n ? 'on' : ''}" data-act="t-freq" data-v="${n}">${n === 12 ? '1 an' : n === 24 ? '2 ans' : n + ' mois'}</button>`).join('')}</div>
     <div class="lbl">Outillage & produits <span style="text-transform:none;letter-spacing:0">(facultatif)</span></div><input class="field" id="t-outils" value="${esc(v.outils)}" maxlength="200">
-    <div class="note">Elle apparaîtra en « Jamais faite » : note son premier passage avec FAIT, la prochaine date se calculera seule.</div>
+    ${f.edit ? '' : '<div class="note">Elle apparaîtra en « Jamais faite » : note son premier passage avec FAIT, la prochaine date se calculera seule.</div>'}
     <div class="err" id="t-err"></div>
-    <button class="go" data-act="t-save">＋ Ajouter la tâche</button>`);
+    <button class="go" data-act="t-save">${f.edit ? 'Enregistrer' : '＋ Ajouter la tâche'}</button>
+    ${f.edit && !f.nomFige ? `<button class="go danger ${f.arm ? 'armed' : ''}" data-act="t-del">${f.arm ? 'Confirmer la suppression' : 'Supprimer cette tâche'}</button>` : ''}
+    ${f.edit && f.nomFige ? '<div class="muted" style="font-size:12px;margin-top:8px">Une tâche qui a des passages ne se supprime que dans le fichier (pour garder son historique).</div>' : ''}`);
 }
 function lireTacheForm() {
   const v = S.form.v; ['element', 'intervention', 'outils'].forEach(k => { const e = $('#t-' + k); if (e) v[k] = e.value.trim(); });
   const z = $('#t-zone'); if (z) v.zone = z.value.trim();
+}
+function modifierTache(t, champs) {
+  const creation = S.queue.findIndex(o => o.action === 'tache-save' && o.id === t.id);
+  if (creation === 0 && S.busy) { $('#t-err').textContent = 'Envoi en cours : réessaie dans un instant'; return; }
+  if (!t.row && creation < 0) { $('#t-err').textContent = 'Envoi en cours : réessaie dans un instant'; return; }
+  const avant = t.srvEl || t.element;
+  Object.assign(t, champs, { freqTxt: freqTxt(champs.freq), pending: true });
+  if (t.dernier) recalc(t);
+  if (creation >= 0) S.queue[creation].payload.tache = champs;   // pas encore envoyée : on corrige la création
+  else { enfiler({ op: 'call', action: 'tache-maj', payload: { row: t.row, attendu: { element: avant }, tache: champs }, after: 'tache', id: t.id }); t.srvEl = champs.element; }
+  sauver(); fermer(); rendre(true); toast('Tâche modifiée');
+}
+function supprimerTache() {
+  const f = S.form; if (!f.arm) { lireTacheForm(); f.arm = true; rendreTacheNew(); return; }
+  const t = S.d.entretien.find(x => x.id === f.edit); if (!t) return fermer();
+  const creation = S.queue.findIndex(o => o.action === 'tache-save' && o.id === t.id);
+  if ((creation === 0 && S.busy) || (!t.row && creation < 0)) { $('#t-err').textContent = 'Envoi en cours : réessaie dans un instant'; return; }
+  if (creation >= 0) retirerEnAttente('tache', t.id);
+  else enfiler({ op: 'call', action: 'tache-del', payload: { row: t.row, attendu: { element: t.srvEl || t.element } } });
+  S.d.entretien = S.d.entretien.filter(x => x !== t); sauver(); fermer(); rendre(true); toast('Tâche supprimée');
 }
 function enregistrerTache() {
   if (!S.form || S.form.mode !== 'tache') return;   // double appui : déjà enregistrée
@@ -783,8 +812,10 @@ function enregistrerTache() {
   const zc = z => norm(z).replace(/[^a-z0-9]/g, ''), zx = S.d.entretien.map(t => t.zone).find(z => z && zc(z) === zc(v.zone));
   if (zx) v.zone = zx;   // « cuisine » → « 🍳 Cuisine » : pas de zone en double
   if (!v.element) { $('#t-err').textContent = "Donne un nom à l'élément"; return; }
-  if (S.d.entretien.some(t => norm(t.element) === norm(v.element))) { $('#t-err').textContent = 'Cette tâche existe déjà dans le carnet'; return; }
+  const ici = S.form.edit ? S.d.entretien.find(x => x.id === S.form.edit) : null;
+  if (S.d.entretien.some(t => t !== ici && norm(t.element) === norm(v.element))) { $('#t-err').textContent = 'Cette tâche existe déjà dans le carnet'; return; }
   const champs = { zone: v.zone, element: v.element, intervention: v.intervention, freq: +v.freq, outils: v.outils };
+  if (ici) return modifierTache(ici, champs);
   const t = Object.assign({ id: uid(), row: null, freqTxt: freqTxt(+v.freq), dernier: '', prochain: '', jours: null, etat: 'À PLANIFIER', pending: true }, champs);
   S.d.entretien.push(t); sauver();
   enfiler({ op: 'call', action: 'tache-save', payload: { tache: champs }, after: 'tache', id: t.id });
@@ -873,6 +904,7 @@ function ouvrirTache(el) {
     <div>Dernier passage</div><div class="mono">${fr(t.dernier)}</div><div>Prochain</div><div class="mono"><b>${fr(t.prochain)}</b></div>
     <div>Outillage</div><div>${esc(t.outils || '—')}</div></div>
     <button class="go" data-act="fait" data-el="${esc(t.element)}">✓ C'est fait</button>
+    ${peutAjouter() ? `<button class="go sec2" data-act="tache-edit" data-el="${esc(t.element)}">✏️ Modifier la tâche</button>` : ''}
     <div class="lbl">Derniers passages</div>
     <div class="list">${H.length ? H.map(h => `<div class="item tap" data-act="passage" data-id="${esc(h.id)}"><span class="mono" style="font-weight:600">${fr(h.date)}</span><span class="grow"></span><span class="mono muted">${h.duree ? esc(h.duree) + ' min' : ''}</span></div>`).join('') : '<div class="empty">Jamais fait</div>'}</div>`);
 }
@@ -1820,7 +1852,7 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
     ['🚦 Les états', '<b>En retard</b> dès le lendemain de la date prévue · <b>Sous 30 jours</b> : à caler dans l\'agenda · <b>RAS</b> : rien à signaler · <b>Jamais faites</b> : à planifier une 1re fois.'],
     ['✉️ Le mail', 'Le matin où une tâche arrive à échéance, un mail part, <b>une seule fois</b> : jamais de relance. La tâche reste en retard dans l\'appli jusqu\'à « C\'est fait ».'],
     ['📒 Historique', 'Tous les passages notés. Touche un passage pour corriger sa date ou sa durée, ou le supprimer (il faut toucher deux fois).'],
-    peutAjouter() && ['＋ Nouvelle tâche', 'En bas de l\'onglet Entretien : « Ajouter une tâche » (zone, élément, ce qu\'il faut faire, fréquence en mois). Elle arrive en « Jamais faite » ; note son premier passage avec FAIT.'],
+    peutAjouter() && ['＋ Nouvelle tâche', 'En bas de l\'onglet Entretien : « Ajouter une tâche » (zone, élément, ce qu\'il faut faire, fréquence en mois). Elle arrive en « Jamais faite » ; note son premier passage avec FAIT. Pour la corriger : touche-la, « Modifier la tâche » (elle se supprime tant qu\'aucun passage n\'est noté).'],
     mod('consommables') && ['🧴 Consommables', 'Dans l\'onglet Entretien : les produits d\'entretien et ce qu\'il reste à racheter.']
   ]);
   if (inv) h += bloc('L\'inventaire', [
@@ -1917,7 +1949,8 @@ function apiEssai(action, x) {
   const non = { ok: false, error: 'ESSAI', message: 'Pas disponible dans le carnet d\'essai' };
   if (action === 'data') { const c = LS.get('cache', null); return { ok: true, data: c ? JSON.parse(JSON.stringify(c)) : donneesEssai() }; }
   if (action === 'photos-liste') return { ok: true, total: 0, photos: [] };
-  if (action === 'liste-ajout') return { ok: true };
+  if (action === 'liste-ajout' || action === 'tache-del') return { ok: true };
+  if (action === 'tache-maj') return { ok: true, row: x.row };
   if (action === 'tache-save') { const r = LS.get('essaiRow', 500) + 1; LS.set('essaiRow', r); return { ok: true, row: r, tache: Object.assign({}, x.tache, { row: r, dernier: '', prochain: '', jours: null, etat: 'À PLANIFIER', freqTxt: freqTxt(x.tache.freq) }) }; }
   if (action === 'export-statut') return { ok: true, statut: null, dernier: null };
   if (/^(export|photo|mail-test)/.test(action)) return non;
@@ -2069,6 +2102,8 @@ document.addEventListener('click', ev => {
     case 't-zone-neuve': lireTacheForm(); S.form.zoneNeuve = true; S.form.v.zone = ''; rendreTacheNew(); setTimeout(() => { const e = $('#t-zone'); if (e) e.focus(); }, 50); break;
     case 't-freq': lireTacheForm(); S.form.v.freq = +el.dataset.v; rendreTacheNew(); break;
     case 't-save': enregistrerTache(); break;
+    case 't-del': supprimerTache(); break;
+    case 'tache-edit': ouvrirTacheEdit(el.dataset.el); break;
     case 'b-del': supprimerBien(); break;
     case 'photo': $('#fileIn').value = ''; $('#fileIn').click(); break;
     case 'photo-gal': $('#galIn').value = ''; $('#galIn').click(); break;
@@ -2129,6 +2164,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) { ra
 /* ================= DÉMARRAGE ================= */
 function idsLocaux() { // identifiants stables pour l'interface
   if (!S.d) return;
+  S.d.entretien.forEach(t => { if (!t.id) t.id = 't' + t.row; });
   S.d.historique.forEach(h => { if (!h.id) h.id = 'h' + h.row; if (h.row && !h.srv) h.srv = { date: h.date, element: h.element }; });
   S.d.inventaire.forEach(b => { if (!b.id) b.id = 'b' + b.row; if (!b.srvObjet) b.srvObjet = b.objet; });
   S.d.contacts.forEach(c => { if (!c.id) c.id = 'c' + c.row; if (!c.srv) c.srv = { pourquoi: c.pourquoi, nom: c.nom }; });
