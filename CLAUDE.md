@@ -31,4 +31,4 @@ Appli de Théo pour suivre l'entretien de son T3 (échéances, passages, mail d'
 Qui relit quoi : texte ou petit affichage → personne ; nouvel écran/geste → utilisateur ; calcul, échéance, mail → syndic + code ; données, envois, mise en ligne du script → code ; gros changement → les 4. À chaque version, dire à Théo quels agents ont relu et pourquoi.
 
 ## État au 24/11/2026
-Appli 1.8.5, script 1.8.2, Export 2.5. Audit de novembre entièrement corrigé. Pas de chantier en cours.
+Appli 1.8.6 en ligne. Script 1.8.3 **prêt dans `app_scripts` mais pas encore mis en ligne** (pas de connexion `clasp` dans la session cloud) : tant qu'il ne l'est pas, le bouton « Ouvrir le Sheet » est masqué et l'ancien défaut des mails de garantie reste. Défauts restants : `app_scripts/carnet-t3/IDEES.md`. Chantier suivant validé : carnet commun T3 / T4 / Clément.

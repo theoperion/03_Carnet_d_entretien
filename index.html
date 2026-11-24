@@ -202,6 +202,7 @@ textarea.field{min-height:70px;resize:vertical}
 
 /* ---------- divers ---------- */
 .toast{position:fixed;left:50%;bottom:calc(98px + var(--safeB));transform:translate(-50%,20px);width:max-content;min-width:min(300px,92vw);background:var(--enc);color:#fff;padding:10px 14px;border-radius:4px;z-index:60;display:flex;gap:14px;align-items:center;opacity:0;pointer-events:none;transition:all .2s;max-width:92vw;box-shadow:0 4px 14px rgba(0,0,0,.3);border-left:5px solid var(--yel)}
+#sheet.on ~ .toast{bottom:auto;top:calc(12px + env(safe-area-inset-top,0px))}   /* 1.8.6 : fenêtre ouverte = message en haut, il ne cache plus « Enregistrer » */
 .toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 .toast button{color:var(--yel);font-family:var(--t);letter-spacing:1px;font-size:13px}
 #lock{position:fixed;inset:0;z-index:80;background:var(--kraft);display:grid;place-items:center;padding:24px}
@@ -374,7 +375,8 @@ html[data-theme="nuit"] .tag,html[data-theme="cine"] .tag{filter:saturate(.85) b
 /* ================= CONFIG ================= */
 // Colle ici l'URL de ton déploiement Apps Script (…/exec). Sinon l'app te la demandera à la première ouverture.
 const API_URL = 'https://script.google.com/macros/s/AKfycbwsDzmjF3b4PLGZkLthvBPz9nFj_FIQZQOYNMTvDaFgAS8nYkpoOk18S94G_va4QJnnxQ/exec';
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1iy3H37w2_-2DAS21jzTKz2N_3QewGSZgVtQ7Thl0BKA/edit';
+// 1.8.6 : l'adresse du Sheet n'est plus écrite ici (dépôt public) : le script la donne après la clé
+const sheetUrl = () => (S.d && S.d.serveur && /^https:\/\/docs\.google\.com\//.test(S.d.serveur.sheetUrl || '')) ? S.d.serveur.sheetUrl : '';
 const VERSION = (self.CARNET_VERSION || {}).app || '?';   // le numéro se change dans version.js
 
 /* ================= OUTILS ================= */
@@ -1015,8 +1017,8 @@ function ouvrirContact(id) {
   ouvrir(tete(id ? 'Modifier le contact' : 'Nouveau contact') + `
     <div class="lbl">Pour quoi</div><input class="field" id="c-pourquoi" value="${esc(v.pourquoi)}" placeholder="Ex. Plombier, SAV four…">
     <div class="lbl">Entreprise / nom</div><input class="field" id="c-nom" value="${esc(v.nom)}">
-    <div class="grid2"><div><div class="lbl">Téléphone</div><input class="field mono" id="c-tel" type="tel" value="${esc(v.tel)}"></div>
-    <div><div class="lbl">E-mail</div><input class="field" id="c-mail" type="email" value="${esc(v.mail)}"></div></div>
+    <div class="lbl">Téléphone</div><input class="field mono" id="c-tel" type="tel" value="${esc(v.tel)}">
+    <div class="lbl">E-mail</div><input class="field" id="c-mail" type="email" value="${esc(v.mail)}">
     <div class="lbl">Notes</div><textarea class="field" id="c-notes">${esc(v.notes)}</textarea>
     <div class="err" id="c-err"></div>
     <button class="go" data-act="c-save">Enregistrer</button>
@@ -1695,7 +1697,7 @@ function ouvrirReglages() {
     </div>
     <button class="go" data-act="trophees">🏆 Trophées, thèmes et vacances</button>
     <button class="go sec2" data-act="mailtest">Envoyer un mail de test</button>
-    <div class="btnrow"><button class="go sec2" data-act="refresh">↻ Actualiser</button><a class="go sec2" href="${SHEET_URL}" target="_blank" rel="noopener">Ouvrir le Sheet</a></div>
+    <div class="btnrow"><button class="go sec2" data-act="refresh">↻ Actualiser</button>${sheetUrl() ? `<a class="go sec2" href="${esc(sheetUrl())}" target="_blank" rel="noopener">Ouvrir le Sheet</a>` : ''}</div>
     <button class="go danger" data-act="logout">Changer de clé d'accès</button>`);
 }
 
