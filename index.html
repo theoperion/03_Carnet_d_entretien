@@ -1808,7 +1808,7 @@ function ouvrirReglages() {
    ajouter son 1er bien). L'entretien est toujours là. */
 const ID_T4 = 'AKfycbysEJTeMDjtS2WHicGgse_l9PJ0h6NL7mYTExIOTW1_aHGp31UzkBzhhTmnsFg1NXsy';
 function mod(m) {
-  if (m === 'entretien') return true;
+  if (m === 'entretien' || DEFAUT) return true;   // le carnet principal T3 a toujours tout
   const sm = S.d && S.d.serveur && S.d.serveur.modules;
   if (Array.isArray(sm)) return sm.includes(m);
   if (idDe(URL_CARNET) === ID_T4) return ['contacts', 'consommables'].includes(m);
@@ -1844,10 +1844,11 @@ function apiEssai(action, x) {
   if (action === 'export-statut') return { ok: true, statut: null, dernier: null };
   if (/^(export|photo|mail-test)/.test(action)) return non;
   const r = LS.get('essaiRow', 500) + 1; LS.set('essaiRow', r);
-  return { ok: true, row: x.row || r };
+  return action === 'inv-save' ? { ok: true, row: x.row || r, bien: Object.assign({}, x.bien, { row: x.row || r }) } : { ok: true, row: x.row || r };   // comme le vrai script : le bien enregistré revient
 }
 function quitterEssai() {   // retour au carnet principal, ou au dernier autre carnet ouvert s'il n'y a pas de clé T3 sur le téléphone
-  const c = connus(); delete c[ID_ESSAI]; LS.set('connus', c); ['cache', 'queue', 'key', 'essaiRow'].forEach(k => LS.del(k));
+  const c = connus(); delete c[ID_ESSAI]; LS.set('connus', c);
+  try { Object.keys(localStorage).filter(k => k.startsWith('carnet.' + NS)).forEach(k => localStorage.removeItem(k)); } catch (e) {}   // tout l'espace de l'essai
   const autre = Object.keys(c).find(id => id !== idDe(API_URL) && ID_OK.test(id));
   try { sessionStorage.setItem('carnet.apresEssai', '1'); } catch (e) {}
   changerCarnet(!clesSurTel().includes('carnet.key') && autre ? urlDe(autre) : API_URL);
@@ -1856,8 +1857,8 @@ function quitterEssai() {   // retour au carnet principal, ou au dernier autre c
 function nomSur(n, id) {
   n = String(n || '').replace(/\s+/g, ' ').trim().slice(0, 30); if (!n) return '';
   if ((id || idDe(URL_CARNET)) === idDe(API_URL)) return n;
-  const c = x => norm(x).replace(/[^a-z0-9]/g, '');
-  return /(^|carnet|appart\w*|logement)t3$/.test(c(n)) || c(n) === c('Carnet · T3') ? '' : n;
+  const c = x => norm(String(x).normalize('NFKD').replace(/[ТтΤτƬƫŦŧȚțʈ]/g, 't').replace(/[ЗзƷʒ]/g, '3')).replace(/[^a-z0-9]/g, '');   // aussi les lettres qui imitent « T3 »
+  return /(^|carnet|appart\w*|logement)t3$/.test(c(n)) || c(n).includes('carnett3') ? '' : n;
 }
 function nomCarnet() {   // 1.9 : le script peut donner un nom (serveur.nom) ; sinon « Carnet · T3 » pour le carnet principal
   const n = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);
