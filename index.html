@@ -373,8 +373,31 @@ html[data-theme="nuit"] .tag,html[data-theme="cine"] .tag{filter:saturate(.85) b
 <script src="version.js"></script>
 <script>
 /* ================= CONFIG ================= */
-// Colle ici l'URL de ton déploiement Apps Script (…/exec). Sinon l'app te la demandera à la première ouverture.
+// Carnet par défaut (celui de Théo). Un autre carnet s'ouvre par son lien d'installation …/#s=<id du script>.
 const API_URL = 'https://script.google.com/macros/s/AKfycbwsDzmjF3b4PLGZkLthvBPz9nFj_FIQZQOYNMTvDaFgAS8nYkpoOk18S94G_va4QJnnxQ/exec';
+/* 1.9 : plusieurs carnets dans la même appli. Chaque carnet garde SES données sur le téléphone (clé, file d'attente,
+   copie locale) sous un préfixe propre : une saisie ne peut jamais partir vers le script d'un autre carnet.
+   Le carnet par défaut garde les noms d'avant (carnet.key, carnet.queue, carnet.cache) : rien à migrer. */
+const ID_OK = /^[A-Za-z0-9_-]{20,120}$/;
+const urlDe = id => 'https://script.google.com/macros/s/' + id + '/exec';
+const idDe = u => { const m = /^https:\/\/script\.google\.com\/macros\/s\/([A-Za-z0-9_-]{20,120})\/exec$/.exec(String(u || '').trim()); return m ? m[1] : ''; };
+const lireLien = s => { s = String(s || '').trim(); const m = /[#&]s=([A-Za-z0-9_-]+)/.exec(s); return m && ID_OK.test(m[1]) ? m[1] : idDe(s); };
+(function () {   // lien d'installation : lu et effacé AVANT tout le reste (historique, bouton retour)
+  const id = lireLien(location.hash);
+  if (location.hash) try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
+  if (id) try { localStorage.setItem('carnet.url', JSON.stringify(urlDe(id))); } catch (e) {}
+})();
+const URL_CARNET = (function () { try { const u = JSON.parse(localStorage.getItem('carnet.url') || 'null'); return idDe(u) ? u : API_URL; } catch (e) { return API_URL; } })();
+const DEFAUT = URL_CARNET === API_URL;
+const NS = DEFAUT ? '' : 'c' + Array.from(idDe(URL_CARNET)).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36) + '.';
+const COMMUN = { theme: 1, tab: 1, url: 1 };   // réglages communs à tous les carnets du téléphone
+const lienCarnet = () => location.origin + location.pathname + '#s=' + idDe(URL_CARNET);
+window.addEventListener('hashchange', () => {   // lien ouvert alors que l'appli est déjà ouverte
+  const id = lireLien(location.hash); if (!id) return;
+  try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
+  if (urlDe(id) !== URL_CARNET) changerCarnet(urlDe(id));
+});
+function changerCarnet(u) { try { if (u === API_URL) localStorage.removeItem('carnet.url'); else localStorage.setItem('carnet.url', JSON.stringify(u)); } catch (e) {} location.reload(); }
 // 1.8.6 : l'adresse du Sheet n'est plus écrite ici (dépôt public) : le script la donne après la clé
 const sheetUrl = () => (S.d && S.d.serveur && /^https:\/\/docs\.google\.com\//.test(S.d.serveur.sheetUrl || '')) ? S.d.serveur.sheetUrl : '';
 const VERSION = (self.CARNET_VERSION || {}).app || '?';   // le numéro se change dans version.js
@@ -382,9 +405,10 @@ const VERSION = (self.CARNET_VERSION || {}).app || '?';   // le numéro se chang
 /* ================= OUTILS ================= */
 const $ = s => document.querySelector(s);
 const LS = {
-  get(k, d) { try { const v = localStorage.getItem('carnet.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem('carnet.' + k, JSON.stringify(v)); } catch (e) {} },
-  del(k) { try { localStorage.removeItem('carnet.' + k); } catch (e) {} }
+  n(k) { return 'carnet.' + (COMMUN[k] ? '' : NS) + k; },
+  get(k, d) { try { const v = localStorage.getItem(LS.n(k)); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(LS.n(k), JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(LS.n(k)); } catch (e) {} }
 };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -437,12 +461,12 @@ const gStamp = s => s ? `<span class="stamp st-${s.replace(/[\sÉÔ]/g, m => m =
 
 /* ================= ÉTAT ================= */
 const S = {
-  d: null, key: LS.get('key', ''), url: LS.get('url', ''), queue: LS.get('queue', []),
+  d: null, key: LS.get('key', ''), queue: LS.get('queue', []),
   tab: LS.get('tab', 'bord'), fEt: 'TOUT', fZone: null, vue: 'urgence',
   hZone: null, iq: '', iPiece: null, iFiltre: null, form: null, busy: false, lastFetch: 0
 };
 (function () { const c = LS.get('cache', null); if (c) S.d = c; })();
-const apiUrl = () => (API_URL && !API_URL.startsWith('COLLE')) ? API_URL : S.url;
+const apiUrl = () => URL_CARNET;   // 1.9 : fixé au démarrage ; changer de carnet recharge la page
 function sauver() { LS.set('cache', S.d); LS.set('queue', S.queue); }
 
 /* ================= CALCULS ================= */
@@ -588,7 +612,7 @@ function rendre(silencieux) {
   if (!S.d) { $('#main').innerHTML = '<div class="empty">Chargement du carnet…</div>'; return; }
   rafraichirEtats();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.act === 'tab:' + S.tab));
-  const T = { bord: ['Carnet · T3', 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], inventaire: ['Inventaire', 'Assurance MAIF · biens, factures, photos'] }[S.tab];
+  const T = { bord: [nomCarnet(), 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], inventaire: ['Inventaire', 'Assurance MAIF · biens, factures, photos'] }[S.tab];
   $('#htitle').textContent = T[0]; $('#hsub').textContent = T[1];
   const y = scrollY;
   $('#main').innerHTML = `<div class="view">${({ bord: vBord, entretien: vEntretien, histo: vHisto, inventaire: vInventaire })[S.tab]()}</div>`;
@@ -1720,34 +1744,58 @@ function ouvrirReglages() {
     <button class="go sec2" data-act="aide-r">❓ Comment ça marche</button>
     <button class="go sec2" data-act="mailtest">Envoyer un mail de test</button>
     <div class="btnrow"><button class="go sec2" data-act="refresh">↻ Actualiser</button>${sheetUrl() ? `<a class="go sec2" href="${esc(sheetUrl())}" target="_blank" rel="noopener">Ouvrir le Sheet</a>` : ''}</div>
+    <div class="lbl">Ce carnet sur un autre téléphone</div>
+    <button class="go sec2" data-act="partager">📤 Partager le lien de ce carnet</button>
+    <p class="muted" style="font-size:12.5px;font-style:italic;margin:4px 2px 10px">Le lien ouvre ce carnet ; la clé d'accès reste nécessaire (ne l'envoie pas dans le même message).</p>
+    <button class="go sec2" data-act="autre-carnet">🔁 Ouvrir un autre carnet</button>
+    ${DEFAUT ? '' : '<button class="go sec2" data-act="carnet-def">‹ Revenir au carnet principal</button>'}
     <button class="go danger" data-act="logout">Changer de clé d'accès</button>`);
+}
+
+function nomCarnet() {   // 1.9 : le script peut donner un nom (serveur.nom) ; sinon « Carnet · T3 » pour le carnet principal
+  const n = S.d && S.d.serveur && S.d.serveur.nom;
+  return n ? String(n).slice(0, 30) : DEFAUT ? 'Carnet · T3' : 'Mon carnet';
+}
+function partagerLien() {   // 1.9 : partage du lien d'installation (SMS, WhatsApp, mail…) ; copie si le partage n'existe pas
+  const url = lienCarnet(), titre = 'Mon carnet d\'entretien';
+  if (navigator.share) { navigator.share({ title: titre, text: 'Ouvre ce lien sur ton téléphone pour installer le carnet :', url }).catch(() => {}); return; }
+  const fini = () => toast('🔗 Lien copié : colle-le dans un message');
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(fini, () => prompt('Copie ce lien :', url)); else prompt('Copie ce lien :', url);
 }
 
 /* ================= VERROU ================= */
 function verrouiller(msg) {
   const l = $('#lock'); l.hidden = false;
-  const besoinUrl = !API_URL || API_URL.startsWith('COLLE');
-  l.innerHTML = `<div class="in"><img src="icon-192.png" alt=""><h1>Carnet · T3</h1>
-    <p class="muted" style="margin:0 0 18px;font-style:italic">Entretien & inventaire de l'appartement</p>
-    ${besoinUrl ? `<input class="field" id="kurl" placeholder="URL de l'API (…/exec)" value="${esc(S.url || '')}" autocomplete="off">` : ''}
+  l.innerHTML = `<div class="in"><img src="icon-192.png" alt=""><h1>${DEFAUT ? 'Carnet · T3' : 'Carnet d\'entretien'}</h1>
+    <p class="muted" style="margin:0 0 18px;font-style:italic">${DEFAUT ? 'Entretien & inventaire de l\'appartement' : 'Ton carnet · lien reçu, il ne reste que la clé'}</p>
     <input class="field" id="kin" type="password" placeholder="Clé d'accès" autocomplete="current-password">
     <div class="err" id="kerr">${msg ? esc(msg) : ''}</div>
-    <button class="go" id="kgo">Ouvrir le carnet</button></div>`;
+    <button class="go" id="kgo">Ouvrir le carnet</button>
+    <button class="go sec2" id="klien" style="margin-top:14px">🔗 J'ai un lien vers mon carnet</button>
+    <div id="kzone" hidden><input class="field" id="kurl" placeholder="Colle ici le lien de ton carnet" autocomplete="off"><button class="go sec2" id="kok">Utiliser ce lien</button></div>
+    ${DEFAUT ? '' : '<button class="go sec2" id="kdef" style="margin-top:6px">‹ Revenir au carnet principal</button>'}</div>`;
   const go = $('#kgo');
   const valider = async () => {
-    const v = $('#kin').value.trim(), u = $('#kurl') ? $('#kurl').value.trim() : '';
-    if ($('#kurl') && !/^https:\/\/script\.google(usercontent)?\.com\//.test(u)) { $('#kerr').textContent = "Colle l'URL du déploiement Apps Script (elle finit par /exec)"; return; }
+    const v = $('#kin').value.trim();
     if (!v) { $('#kerr').textContent = 'Tape ta clé'; return; }
-    go.textContent = 'Vérification…'; S.key = v; if (u) S.url = u;
+    go.textContent = 'Vérification…'; S.key = v;
     try {
       const r = await api('data');
       if (!r.ok) { go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = r.message || 'Clé incorrecte'; return; }
-      LS.set('key', v); if (u) LS.set('url', u); S.d = null; charger(r.data); if (S.queue.length) pomper();   // 1.8 : la file n'est plus effacée
+      LS.set('key', v); S.d = null; charger(r.data); if (S.queue.length) pomper();   // 1.8 : la file n'est plus effacée
       l.hidden = true; S.lastFetch = Date.now(); setSync('ok'); rendre();
-    } catch (e) { go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = 'Connexion impossible. Vérifie l\'URL et ta connexion.'; }
+    } catch (e) { go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = 'Connexion impossible. Vérifie ta connexion, ou le lien de ton carnet.'; }
   };
   go.addEventListener('click', valider);
   $('#kin').addEventListener('keydown', e => { if (e.key === 'Enter') valider(); });
+  $('#klien').addEventListener('click', () => { $('#kzone').hidden = false; $('#klien').hidden = true; $('#kurl').focus(); });
+  $('#kok').addEventListener('click', () => {   // sur iPhone, l'appli installée ne garde pas le lien : on le colle ici
+    const id = lireLien($('#kurl').value);
+    if (!id) { $('#kerr').textContent = 'Ce lien n\'est pas celui d\'un carnet (il contient « #s= » ou finit par /exec).'; return; }
+    if (urlDe(id) === URL_CARNET) { $('#kzone').hidden = true; $('#klien').hidden = false; return; }
+    changerCarnet(urlDe(id));
+  });
+  if ($('#kdef')) $('#kdef').addEventListener('click', () => changerCarnet(API_URL));
 }
 
 /* ================= TOAST ================= */
@@ -1830,6 +1878,9 @@ document.addEventListener('click', ev => {
     case 'k-save': enregistrerConso(); break;
     case 'k-del': supprimerConso(); break;
     case 'logout': fermer(); LS.del('key'); S.key = ''; verrouiller(); break;
+    case 'partager': partagerLien(); break;
+    case 'autre-carnet': fermer(); verrouiller(); $('#klien').click(); break;
+    case 'carnet-def': changerCarnet(API_URL); break;
   }
 });
 document.addEventListener('input', ev => {
