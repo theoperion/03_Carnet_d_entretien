@@ -375,10 +375,11 @@ html[data-theme="nuit"] .tag,html[data-theme="cine"] .tag{filter:saturate(.85) b
 <script src="version.js"></script>
 <script>
 /* ================= CONFIG ================= */
-// 1.9.2 : copie figée (dossier fige/…, fabriquée par outils/figer.py) : { dossier, id, nom }. null = l'appli normale de Théo.
+// 1.9.2 : copie figée (fabriquée par outils/figer.py) : { dossier, id, nom }. null = l'appli normale de Théo.
+// 1.9.3 : id null = version commune (Mon_Carnet) sans carnet par défaut : au 1er lancement, on colle le lien de SON carnet.
 const FIGE = {"dossier": "t4", "id": "AKfycbysEJTeMDjtS2WHicGgse_l9PJ0h6NL7mYTExIOTW1_aHGp31UzkBzhhTmnsFg1NXsy", "nom": "Carnet · T4"};   // COPIE FIGÉE (outils/figer.py) : ne pas modifier
 // Carnet par défaut (celui de Théo, ou celui de la copie figée). Un autre carnet s'ouvre par son lien …/#s=<id du script>.
-const API_URL = FIGE ? 'https://script.google.com/macros/s/' + FIGE.id + '/exec' : 'https://script.google.com/macros/s/AKfycbwsDzmjF3b4PLGZkLthvBPz9nFj_FIQZQOYNMTvDaFgAS8nYkpoOk18S94G_va4QJnnxQ/exec';
+const API_URL = FIGE ? (FIGE.id ? 'https://script.google.com/macros/s/' + FIGE.id + '/exec' : null) : 'https://script.google.com/macros/s/AKfycbwsDzmjF3b4PLGZkLthvBPz9nFj_FIQZQOYNMTvDaFgAS8nYkpoOk18S94G_va4QJnnxQ/exec';
 const PFX = FIGE ? 'cf-' + FIGE.dossier + '.' : 'carnet.';   // données du téléphone : une copie figée ne touche jamais à celles de l'appli normale
 const NOM_DEFAUT = FIGE ? FIGE.nom : 'Carnet · T3';
 /* 1.9 : plusieurs carnets dans la même appli. Chaque carnet garde SES données sur le téléphone (clé, file d'attente,
@@ -407,7 +408,8 @@ function arriveeLien(id) {   // renvoie true si on peut ouvrir tout de suite (ca
   if (id && arriveeLien(id)) try { if (id === idDe(API_URL)) localStorage.removeItem(PFX + 'url'); else localStorage.setItem(PFX + 'url', JSON.stringify(urlDe(id))); } catch (e) {}
 })();
 const URL_CARNET = (function () { try { const u = JSON.parse(localStorage.getItem(PFX + 'url') || 'null'); return idDe(u) ? u : API_URL; } catch (e) { return API_URL; } })();
-const DEFAUT = URL_CARNET === API_URL, ESSAI = idDe(URL_CARNET) === ID_ESSAI;
+const SANS_CARNET = !URL_CARNET;   // version commune, rien d'ouvert encore
+const DEFAUT = !!API_URL && URL_CARNET === API_URL, ESSAI = idDe(URL_CARNET) === ID_ESSAI;
 const EST_T3 = DEFAUT && !FIGE;   // le carnet T3 de Théo (aquarium, salle ciné, inventaire complet)
 const NS = nsDe(idDe(URL_CARNET));
 const COMMUN = { theme: 1, tab: 1, url: 1, connus: 1 };   // réglages communs à tous les carnets du téléphone
@@ -656,7 +658,7 @@ function rendre(silencieux) {
   if (S.tab === 'inventaire' && !mod('inventaire')) S.tab = 'bord';
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.act === 'tab:' + S.tab));
   const T = { bord: [nomCarnet(), 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], inventaire: ['Inventaire', 'Assurance MAIF · biens, factures, photos'] }[S.tab];
-  $('#htitle').textContent = T[0]; $('#hsub').textContent = (DEFAUT || S.tab === 'bord' ? '' : '📒 ' + nomCarnet() + ' · ') + T[1];   // 1.9 : on voit toujours dans quel carnet on est
+  $('#htitle').textContent = T[0]; $('#hsub').textContent = (DEFAUT || FIGE || S.tab === 'bord' ? '' : '📒 ' + nomCarnet() + ' · ') + T[1];   // 1.9 : on voit toujours dans quel carnet on est
   const y = scrollY;
   $('#main').innerHTML = `<div class="view">${({ bord: vBord, entretien: vEntretien, histo: vHisto, inventaire: vInventaire })[S.tab]()}</div>`;
   if (silencieux) scrollTo(0, y);
@@ -1867,7 +1869,7 @@ function nomSur(n, id) {
 }
 function nomCarnet() {   // 1.9 : le script peut donner un nom (serveur.nom) ; sinon « Carnet · T3 » pour le carnet principal
   const n = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);
-  return n || (DEFAUT ? NOM_DEFAUT : 'Autre carnet');
+  return n || (DEFAUT ? NOM_DEFAUT : FIGE ? 'Mon carnet' : 'Autre carnet');
 }
 function retenirCarnet() {   // 1.9 : carnets ouverts avec succès sur ce téléphone (nom affiché, pas de question au prochain lien)
   const c = connus(), id = idDe(URL_CARNET), n = nomSur(S.d && S.d.serveur && S.d.serveur.nom);
@@ -1898,6 +1900,7 @@ function partagerLien() {   // 1.9 : partage du lien d'installation (SMS, WhatsA
 
 /* ================= VERROU ================= */
 function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai reçu un lien de carnet » ouvert depuis les Réglages
+  if (SANS_CARNET) lienSeul = true;   // 1.9.3 : version commune au 1er lancement : on commence par le lien de SON carnet
   /* 1.9 (carnet-utilisateur) : écran neutre. Sur iPhone, l'appli installée oublie le lien : Carla peut tomber sur le carnet
      principal ; elle doit comprendre tout de suite que ce n'est pas le sien et trouver « J'ai reçu un lien de carnet ». */
   const l = $('#lock'); l.hidden = false;
@@ -1906,8 +1909,8 @@ function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai 
   let apresEssai = false; try { apresEssai = !!sessionStorage.getItem(PFX + 'apresEssai'); sessionStorage.removeItem(PFX + 'apresEssai'); } catch (e) {}
   const aide = 'Pas ton carnet ? Touche « J\'ai reçu un lien de carnet » et colle le lien reçu par message.';
   const nomConnu = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);
-  const titre = lienSeul ? 'J\'ai reçu un lien de carnet' : DEFAUT ? 'Carnet d\'entretien' : nomConnu ? esc(String(nomConnu).slice(0, 30)) : 'Carnet ouvert par lien';
-  const sous = lienSeul ? 'Colle le lien reçu par message' : DEFAUT ? 'Tape la clé d\'accès de ton carnet' : nomConnu ? 'Carnet ouvert par lien · il ne reste que sa clé' : 'Il ne reste que la clé de ce carnet';
+  const titre = SANS_CARNET ? 'Mon carnet d\'entretien' : lienSeul ? 'J\'ai reçu un lien de carnet' : DEFAUT ? 'Carnet d\'entretien' : nomConnu ? esc(String(nomConnu).slice(0, 30)) : 'Carnet ouvert par lien';
+  const sous = SANS_CARNET ? 'Colle le lien de ton carnet, reçu par message. Ta clé te sera demandée juste après.' : lienSeul ? 'Colle le lien reçu par message' : DEFAUT ? 'Tape la clé d\'accès de ton carnet' : nomConnu ? 'Carnet ouvert par lien · il ne reste que sa clé' : 'Il ne reste que la clé de ce carnet';
   l.innerHTML = `<div class="in"><img src="icon-192.png" alt=""><h1>${titre}</h1>
     <p class="muted" style="margin:0 0 18px;font-style:italic">${sous}</p>
     <input class="field" id="kin" type="password" placeholder="Clé d'accès" autocomplete="current-password">
@@ -1944,6 +1947,10 @@ function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai 
   if ($('#kdef')) $('#kdef').addEventListener('click', () => changerCarnet(API_URL));
   if ($('#kann')) $('#kann').addEventListener('click', () => { l.hidden = true; l.dataset.annulable = ''; });
   if (lienSeul) { ['#kin', '#kgo', '#klien', '#kdef', '#kaide'].forEach(q => { if ($(q)) $(q).hidden = true; }); $('#kzone').hidden = false; $('#kurl').focus(); }
+  if (SANS_CARNET) {   // 1.9.3 : découvrir l'appli sans carnet
+    const b = document.createElement('button'); b.className = 'go sec2'; b.style.marginTop = '14px'; b.textContent = '🧪 Essayer avec un carnet d\'exemple';
+    b.addEventListener('click', () => changerCarnet(urlDe(ID_ESSAI))); l.querySelector('.in').appendChild(b);
+  }
 }
 
 /* ================= TOAST ================= */
