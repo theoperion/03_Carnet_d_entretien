@@ -207,6 +207,7 @@ textarea.field{min-height:70px;resize:vertical}
 .toast button{color:var(--yel);font-family:var(--t);letter-spacing:1px;font-size:13px}
 #lock{position:fixed;inset:0;z-index:80;background:var(--kraft);display:grid;place-items:center;padding:24px}
 #lock[hidden]{display:none}
+#lock .go[hidden],#lock [hidden]{display:none}
 #lock .in{width:100%;max-width:340px;text-align:center}
 #lock img{width:96px;height:96px;border-radius:22px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 #lock h1{font-family:var(--t);font-weight:700;font-size:26px;letter-spacing:1.5px;margin:18px 0 2px;text-transform:uppercase}
@@ -1745,7 +1746,7 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
   ]);
   h += bloc('Partage et autres carnets', [
     ['📤 Partager', 'Réglages › « Partager le lien de ce carnet » : envoie le lien par message, et la clé d\'accès dans un autre message. Le lien ouvre le carnet sur l\'autre téléphone, la clé le déverrouille.'],
-    ['🔗 Lien reçu', 'Ouvre le lien reçu : l\'appli demande « Ouvrir ce carnet ? », puis sa clé. Sur iPhone, si l\'appli installée ne le reconnaît pas, touche « J\'ai reçu un lien de carnet » et colle le lien.'],
+    ['🔗 Lien reçu', 'Ouvre le lien reçu, puis tape la clé de ce carnet (si un autre carnet est déjà sur le téléphone, l\'appli demande d\'abord « Ouvrir ce carnet ? »). Sur iPhone, si l\'appli installée ne le reconnaît pas, touche « J\'ai reçu un lien de carnet » et colle le lien.'],
     ['📒 Plusieurs carnets', 'Chaque carnet garde ses propres données et ses saisies en attente : rien ne passe d\'un carnet à l\'autre. Les carnets déjà ouverts sur le téléphone sont dans Réglages, pour passer de l\'un à l\'autre.']
   ]);
   h += bloc('Le jeu', [
@@ -1818,15 +1819,18 @@ function partagerLien() {   // 1.9 : partage du lien d'installation (SMS, WhatsA
 }
 
 /* ================= VERROU ================= */
-function verrouiller(msg, annulable) {
+function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai reçu un lien de carnet » ouvert depuis les Réglages
   /* 1.9 (carnet-utilisateur) : écran neutre. Sur iPhone, l'appli installée oublie le lien : Carla peut tomber sur le carnet
      principal ; elle doit comprendre tout de suite que ce n'est pas le sien et trouver « J'ai reçu un lien de carnet ». */
   const l = $('#lock'); l.hidden = false;
   const peutAnnuler = annulable && S.key && S.d;
   const retourT3 = !DEFAUT && clesSurTel().includes('carnet.key');   // seulement si le carnet T3 a déjà été ouvert ici
   const aide = 'Pas ton carnet ? Touche « J\'ai reçu un lien de carnet » et colle le lien reçu par message.';
-  l.innerHTML = `<div class="in"><img src="icon-192.png" alt=""><h1>${DEFAUT ? 'Carnet d\'entretien' : esc(nomCarnet())}</h1>
-    <p class="muted" style="margin:0 0 18px;font-style:italic">${DEFAUT ? 'Tape la clé d\'accès de ton carnet' : 'Carnet ouvert par lien · il ne reste que sa clé'}</p>
+  const nomConnu = (S.d && S.d.serveur && S.d.serveur.nom) || (connus()[idDe(URL_CARNET)] || {}).nom;
+  const titre = lienSeul ? 'J\'ai reçu un lien de carnet' : DEFAUT ? 'Carnet d\'entretien' : nomConnu ? esc(String(nomConnu).slice(0, 30)) : 'Carnet ouvert par lien';
+  const sous = lienSeul ? 'Colle le lien reçu par message' : DEFAUT ? 'Tape la clé d\'accès de ton carnet' : nomConnu ? 'Carnet ouvert par lien · il ne reste que sa clé' : 'Il ne reste que la clé de ce carnet';
+  l.innerHTML = `<div class="in"><img src="icon-192.png" alt=""><h1>${titre}</h1>
+    <p class="muted" style="margin:0 0 18px;font-style:italic">${sous}</p>
     <input class="field" id="kin" type="password" placeholder="Clé d'accès" autocomplete="current-password">
     <div class="err" id="kerr">${msg ? esc(msg) : ''}</div>
     <p class="muted" id="kaide" style="font-size:13px;margin:4px 0 0" ${msg && DEFAUT ? '' : 'hidden'}>${aide}</p>
@@ -1850,7 +1854,7 @@ function verrouiller(msg, annulable) {
   };
   go.addEventListener('click', valider);
   $('#kin').addEventListener('keydown', e => { if (e.key === 'Enter') valider(); });
-  $('#klien').addEventListener('click', () => { $('#kzone').hidden = false; $('#klien').hidden = true; $('#kaide').hidden = true; $('#kurl').focus(); });
+  $('#klien').addEventListener('click', () => { $('#kzone').hidden = false; $('#klien').hidden = true; $('#kaide').hidden = true; $('#kerr').textContent = ''; $('#kurl').focus(); });
   $('#kok').addEventListener('click', () => {   // sur iPhone, l'appli installée ne garde pas le lien : on le colle ici
     const id = lireLien($('#kurl').value);
     if (!id) { $('#kerr').textContent = 'Ce lien ne mène pas à un carnet. Colle le lien reçu par message.'; return; }
@@ -1860,6 +1864,7 @@ function verrouiller(msg, annulable) {
   });
   if ($('#kdef')) $('#kdef').addEventListener('click', () => changerCarnet(API_URL));
   if ($('#kann')) $('#kann').addEventListener('click', () => { l.hidden = true; l.dataset.annulable = ''; });
+  if (lienSeul) { ['#kin', '#kgo', '#klien', '#kdef', '#kaide'].forEach(q => { if ($(q)) $(q).hidden = true; }); $('#kzone').hidden = false; $('#kurl').focus(); }
 }
 
 /* ================= TOAST ================= */
@@ -1943,7 +1948,7 @@ document.addEventListener('click', ev => {
     case 'k-del': supprimerConso(); break;
     case 'logout': fermer(); LS.del('key'); S.key = ''; verrouiller(); break;
     case 'partager': partagerLien(); break;
-    case 'autre-carnet': fermer(); verrouiller('', true); $('#klien').click(); break;
+    case 'autre-carnet': fermer(); verrouiller('', true, true); break;
     case 'aller-carnet': if (ID_OK.test(el.dataset.id || '')) changerCarnet(urlDe(el.dataset.id)); break;
   }
 });
