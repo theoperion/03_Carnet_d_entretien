@@ -19,3 +19,4 @@
 | 24/11/2026 | appli 1.9.6 | Carnet sans inventaire (Carla) : 4e onglet **CONTACTS** (contacts + consommables) à la place de l'Inventaire, le ✓ reste au centre. |
 | 24/11/2026 | appli 1.9.7 | Réglages : **masquer l'aquarium** de l'accueil (par carnet ; série, mois et trophées restent). |
 | 24/11/2026 | script T3 2.0 | Script 2.0 en ligne sur le T3 (déploiement OFFICIELLE v20, retour arrière v19), via Claude dans Chrome. Carnet de Clément installé (script 2.0, mails en pause chez Théo). |
+| 24/11/2026 | script T4 2.0 | Script 2.0 en ligne sur le carnet de Carla (déploiement « Carla » v4, retour v3), onglet Inventaire vide créé, mails toujours en pause chez Théo. |
