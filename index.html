@@ -779,6 +779,8 @@ function lireTacheForm() {
 function enregistrerTache() {
   lireTacheForm(); const v = S.form.v;
   if (!v.zone) { $('#t-err').textContent = 'Choisis une zone (ou crée-en une)'; return; }
+  const zc = z => norm(z).replace(/[^a-z0-9]/g, ''), zx = S.d.entretien.map(t => t.zone).find(z => z && zc(z) === zc(v.zone));
+  if (zx) v.zone = zx;   // « cuisine » → « 🍳 Cuisine » : pas de zone en double
   if (!v.element) { $('#t-err').textContent = "Donne un nom à l'élément"; return; }
   if (S.d.entretien.some(t => norm(t.element) === norm(v.element))) { $('#t-err').textContent = 'Cette tâche existe déjà dans le carnet'; return; }
   const champs = { zone: v.zone, element: v.element, intervention: v.intervention, freq: +v.freq, outils: v.outils };
@@ -1024,9 +1026,14 @@ function enregistrerBien() {
   const pn = $('#b-piece-neuve'), cn = $('#b-categorie-neuve');
   if (pn && pn.value.trim()) v.piece = pn.value.trim().slice(0, 40);
   if (v.categorie === '__neuve') { v.categorie = cn ? cn.value.trim().slice(0, 40) : ''; if (!v.categorie) { $('#b-err').textContent = 'Donne un nom à la nouvelle catégorie'; return; } }
-  [['pieces', v.piece], ['categories', v.categorie]].forEach(([k, val]) => {
-    const L = S.d.listes[k] = S.d.listes[k] || [];
-    if (val && !L.some(x => norm(x) === norm(val))) { L.push(val); enfiler({ op: 'call', action: 'liste-ajout', payload: { liste: k, valeur: val } }); }
+  const memeNom = (L, val) => L.find(x => norm(x).replace(/[^a-z0-9]/g, '') === norm(val).replace(/[^a-z0-9]/g, ''));   // « salon » = « Salon »
+  [['pieces', 'piece'], ['categories', 'categorie']].forEach(([k, champ]) => {
+    const L = S.d.listes[k] = S.d.listes[k] || [], val = v[champ];
+    if (!val) return;
+    const deja = memeNom(L, val);
+    if (deja) { v[champ] = deja; return; }
+    const i = L.findIndex(x => /^(à préciser|autre)$/i.test(x)); if (i >= 0) L.splice(i, 0, val); else L.push(val);   // même place que dans le Sheet
+    enfiler({ op: 'call', action: 'liste-ajout', payload: { liste: k, valeur: val } });
   });
   const champs = { piece: v.piece, categorie: v.categorie, objet: v.objet, marque: v.marque, serie: v.serie, magasin: v.magasin, date: v.date, prix: v.prix, garantie: v.garantie, remarque: v.remarque };
   let b;
