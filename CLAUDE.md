@@ -24,7 +24,7 @@ Appli de Théo pour suivre l'entretien de son T3 (échéances, passages, mail d'
 - **File hors connexion** (1.8) : aucune saisie perdue ni doublée (identifiant par envoi, fusion créer/modifier, délai 30 s, erreur passagère = réessai).
 - Le hors connexion n'efface que ses caches `carnet-t3-…` (Versus et le carnet de Carla sont sur le même domaine).
 - Bouton retour du téléphone : ferme la fenêtre ouverte → tableau de bord → quitte.
-- Tester avant de publier : `python3 -m http.server` + Playwright (Chromium) avec un **faux serveur** (intercepter `https://script.google.com/**`), jamais les vraies données. Théo est sur Firefox Android ; ça doit aussi marcher sur Chrome et iPhone.
+- Tester avant de publier : `python3 -m http.server` + Playwright (Chromium) avec un **faux serveur** (intercepter `https://script.google.com/**`), jamais les vraies données. Théo est sur Firefox Android ; Carla et Clément sur Android (Chrome). Pas d'iPhone (règle iPhone supprimée par Théo le 24/11).
 
 ## Agents (dans `app_scripts/.claude/agents/`, lecture seule)
 4 agents, chacun répond ✅ / ⚠ / « non concerné » avec preuve : **`carnet-syndic`** (expert du logement : échéances, mails, inventaire, jeu de motivation) · **`carnet-code`** (file hors connexion, version, caches, appli ↔ script, sécurité, export) · **`carnet-utilisateur`** (Théo sur son téléphone, captures à 390 px) · **`carnet-avocat`** (gros changement ou nouvelle idée).
