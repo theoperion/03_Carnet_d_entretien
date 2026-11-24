@@ -411,8 +411,10 @@ const URL_CARNET = (function () { try { const u = JSON.parse(localStorage.getIte
 const SANS_CARNET = !URL_CARNET;   // version commune, rien d'ouvert encore
 const DEFAUT = !!API_URL && URL_CARNET === API_URL, ESSAI = idDe(URL_CARNET) === ID_ESSAI;
 const EST_T3 = DEFAUT && !FIGE;   // le carnet T3 de Théo (aquarium, salle ciné, inventaire complet)
+// 1.9.3 (carnet-utilisateur) : hors du T3, on parle d'« assurance » et pas de la MAIF de Théo
+const AS_DE = EST_T3 ? 'MAIF' : 'd\'assurance', AS_NOM = EST_T3 ? 'MAIF' : 'Assurance';
 const NS = nsDe(idDe(URL_CARNET));
-const COMMUN = { theme: 1, tab: 1, url: 1, connus: 1 };   // réglages communs à tous les carnets du téléphone
+const COMMUN = { theme: 1, tab: 1, url: 1, connus: 1, dernier: 1 };   // réglages communs à tous les carnets du téléphone
 const lienCarnet = () => location.origin + location.pathname + '#s=' + idDe(URL_CARNET);
 window.addEventListener('hashchange', () => {   // lien ouvert alors que l'appli est déjà ouverte
   const id = lireLien(location.hash); if (!id) return;
@@ -657,7 +659,7 @@ function rendre(silencieux) {
   const tInv = document.querySelector('.tab[data-act="tab:inventaire"]'); if (tInv) tInv.hidden = !mod('inventaire');
   if (S.tab === 'inventaire' && !mod('inventaire')) S.tab = 'bord';
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.act === 'tab:' + S.tab));
-  const T = { bord: [nomCarnet(), 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], inventaire: ['Inventaire', 'Assurance MAIF · biens, factures, photos'] }[S.tab];
+  const T = { bord: [nomCarnet(), 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], inventaire: ['Inventaire', (EST_T3 ? 'Assurance MAIF · biens' : 'Biens') + ', factures, photos'] }[S.tab];
   $('#htitle').textContent = T[0]; $('#hsub').textContent = (DEFAUT || (FIGE && !FIGE.id) || S.tab === 'bord' ? '' : '📒 ' + nomCarnet() + ' · ') + T[1];   // 1.9 : on voit toujours dans quel carnet on est
   const y = scrollY;
   $('#main').innerHTML = `<div class="view">${({ bord: vBord, entretien: vEntretien, histo: vHisto, inventaire: vInventaire })[S.tab]()}</div>`;
@@ -673,7 +675,7 @@ function vBord() {
   const ajour = E.length ? Math.round(100 * (E.length - ret) / E.length) : 100;
   const H = histo(), m0 = today().slice(0, 7), an = addDays(today(), -365);
   const ceMois = H.filter(h => h.date.slice(0, 7) === m0).length, sur12 = H.filter(h => h.date > an).length;
-  const val = valeurMobilier(), pf = S.d.plafond || 28000, pct = Math.round(100 * val / pf);
+  const val = valeurMobilier(), pf = S.d.plafond || (EST_T3 ? 28000 : 0), pct = pf ? Math.round(100 * val / pf) : 0;   // 1.9.3 : pas de plafond inventé hors T3
   let h = (ESSAI ? `<div class="note" style="margin-bottom:10px">🧪 <b>Carnet d'essai</b> : données inventées, rien ne quitte ce téléphone. Note un passage, ajoute un bien, essaie tout.<div class="btnrow" style="margin-top:8px"><button class="mini" data-act="essai-zero">Recommencer l'essai</button><button class="mini" data-act="essai-quitter">Quitter l'essai</button></div></div>` : '') + carteAffiche() + carteMotivation() + `<div class="sec"><h2>Où en est le carnet</h2></div>
   <div class="kpis">
     <button class="kpi k-red" data-act="etat" data-e="EN RETARD"><span class="lab">En retard</span><span class="val">${ret}</span><span class="sub">à faire maintenant</span></button>
@@ -684,8 +686,8 @@ function vBord() {
   <div class="inkcards">
     <div class="ink"><div class="lab">Carnet à jour</div><div class="val">${ajour} %</div><div class="gauge"><i style="width:${ajour}%"></i></div><div class="sub">des tâches sans retard</div></div>
     <div class="ink"><div class="lab">Passages</div><div class="val">${ceMois} <span style="font-size:15px;font-weight:400">ce mois</span></div><div class="sub">${sur12} sur les 12 derniers mois</div></div>
-    ${mod('inventaire') ? `<button class="ink wide" data-act="tab:inventaire" style="text-align:left"><div class="lab">Valeur du mobilier</div><div class="val">${e0(val)} <span style="font-size:14px;font-weight:400;color:var(--light)">/ ${e0(pf)} assurés</span></div>
-      <div class="gauge"><i style="width:${Math.min(pct, 100)}%;background:${pct >= 95 ? 'var(--red)' : pct >= 90 ? 'var(--ora)' : 'var(--yel)'}"></i></div><div class="sub">${pct} % du plafond MAIF${pct >= 95 ? ' · ⚠️ demande un relèvement du plafond' : pct >= 90 ? ' · pense à faire relever le plafond' : ''}</div></button>` : ''}
+    ${mod('inventaire') ? `<button class="ink wide" data-act="tab:inventaire" style="text-align:left"><div class="lab">Valeur du mobilier</div><div class="val">${e0(val)} ${pf ? `<span style="font-size:14px;font-weight:400;color:var(--light)">/ ${e0(pf)} assurés</span>` : ''}</div>
+      ${pf ? `<div class="gauge"><i style="width:${Math.min(pct, 100)}%;background:${pct >= 95 ? 'var(--red)' : pct >= 90 ? 'var(--ora)' : 'var(--yel)'}"></i></div><div class="sub">${pct} % du plafond ${AS_DE}${pct >= 95 ? ' · ⚠️ demande un relèvement du plafond' : pct >= 90 ? ' · pense à faire relever le plafond' : ''}</div>` : '<div class="sub">mobilier hors travaux</div>'}</button>` : ''}
   </div>`;
   const prochains = E.filter(t => t.prochain).sort(ordreUrg).slice(0, 6);
   h += `<div class="sec"><h2>Prochains passages</h2><button class="lnk" data-act="tab:entretien">Tout voir ›</button></div><div class="list">`;
@@ -770,20 +772,20 @@ const zoneDe = el => (S.d.entretien.find(t => t.element === el) || {}).zone || '
 
 /* ---------- INVENTAIRE ---------- */
 function vInventaire() {
-  const I = S.d.inventaire, val = valeurMobilier(), pf = S.d.plafond || 28000, pct = Math.round(100 * val / pf);
+  const I = S.d.inventaire, val = valeurMobilier(), pf = S.d.plafond || (EST_T3 ? 28000 : 0), pct = pf ? Math.round(100 * val / pf) : 0;
   const sansPhoto = I.filter(b => !b.photo).length, sansPrix = I.filter(b => !b.prix).length, star = I.filter(b => b.garantie > 2).length;
-  let h = `<div class="ink" style="margin-bottom:12px"><div class="lab">Valeur du mobilier</div><div class="val">${e0(val)} <span style="font-size:14px;font-weight:400;color:var(--light)">/ ${e0(pf)}</span></div>
-    <div class="gauge"><i style="width:${Math.min(pct, 100)}%;background:${pct >= 95 ? 'var(--red)' : pct >= 90 ? 'var(--ora)' : 'var(--yel)'}"></i></div><div class="sub">${I.length} biens · ${pct} % du plafond MAIF · hors travaux</div></div>`;
-  if (pct >= 95) h += `<div class="alerte rouge"><span>⚠️</span><span><b>Plafond MAIF presque atteint</b><br>Au-delà de ${e0(pf)}, la différence n'est pas remboursée en cas de sinistre : demande un relèvement du capital mobilier.</span></div>`;
+  let h = `<div class="ink" style="margin-bottom:12px"><div class="lab">Valeur du mobilier</div><div class="val">${e0(val)} ${pf ? `<span style="font-size:14px;font-weight:400;color:var(--light)">/ ${e0(pf)}</span>` : ''}</div>
+    ${pf ? `<div class="gauge"><i style="width:${Math.min(pct, 100)}%;background:${pct >= 95 ? 'var(--red)' : pct >= 90 ? 'var(--ora)' : 'var(--yel)'}"></i></div>` : ''}<div class="sub">${I.length} biens${pf ? ` · ${pct} % du plafond ${AS_DE}` : ''} · hors travaux</div></div>`;
+  if (pf && pct >= 95) h += `<div class="alerte rouge"><span>⚠️</span><span><b>Plafond ${AS_DE} presque atteint</b><br>Au-delà de ${e0(pf)}, la différence n'est pas remboursée en cas de sinistre : demande un relèvement du capital mobilier.</span></div>`;
   const fin30 = I.filter(b => b.finGarantie && b.finGarantie >= today() && b.finGarantie <= addDays(today(), 30)).sort((a, b) => a.finGarantie < b.finGarantie ? -1 : 1);
   fin30.forEach(b => h += `<button class="alerte" data-act="bien" data-id="${esc(b.id)}"><span>🛡</span><span><b>Garantie : fin le ${fr(b.finGarantie)}</b> (dans ${diffJ(b.finGarantie, today())} j)<br>${esc(b.objet)} · teste-le à fond avant la fin, un défaut constaté avant est pris en charge.</span></button>`);
-  h += `<button class="expbtn" data-act="export"><span class="ic">📄</span><span><b>Dossier pour l'assurance</b><small>PDF ou Word · fiches, photos et factures</small></span><span class="chev">›</span></button>`;
+  if (EST_T3) h += `<button class="expbtn" data-act="export"><span class="ic">📄</span><span><b>Dossier pour l'assurance</b><small>PDF ou Word · fiches, photos et factures</small></span><span class="chev">›</span></button>`;
   const J = S.d.jeux || [];
   if (J.length) h += `<button class="expbtn" data-act="ludo"><span class="ic">🎲</span><span><b>Ludothèque</b><small>${J.filter(j => j.assure).length} jeux et extensions assurés · ${e0(valeurLudo())}</small></span><span class="chev">›</span></button>`;
   h += `<div class="search">${ICON.search}<input id="iq" type="search" placeholder="Chercher un objet, une marque, un magasin…" value="${esc(S.iq)}"></div>`;
   const pieces = [...new Set(I.map(b => b.piece))].sort((a, b) => (S.d.listes.pieces.indexOf(a) + 99) % 99 - (S.d.listes.pieces.indexOf(b) + 99) % 99);
   h += `<div class="chips"><button class="chip ${!S.iPiece ? 'on' : ''}" data-act="ipiece" data-p="">Toutes</button>${pieces.map(p => `<button class="chip ${S.iPiece === p ? 'on' : ''}" data-act="ipiece" data-p="${esc(p)}">${esc(p)}<small>${I.filter(b => b.piece === p).length}</small></button>`).join('')}</div>`;
-  const F = [['maif', '🛡 Sélection MAIF', I.filter(b => b.maif).length], ['photo', '📷 Sans photo', sansPhoto], ['prix', '€ Sans prix', sansPrix], ['couverte', '✓ Sous garantie', I.filter(sousGarantie).length], ['star', '★ Garantie +2 ans', star], ['garantie', 'Garantie à surveiller', I.filter(b => b.statut === 'EXPIRE BIENTÔT' || b.statut === 'EXPIRÉE').length]];
+  const F = [['maif', '🛡 Sélection ' + AS_NOM, I.filter(b => b.maif).length], ['photo', '📷 Sans photo', sansPhoto], ['prix', '€ Sans prix', sansPrix], ['couverte', '✓ Sous garantie', I.filter(sousGarantie).length], ['star', '★ Garantie +2 ans', star], ['garantie', 'Garantie à surveiller', I.filter(b => b.statut === 'EXPIRE BIENTÔT' || b.statut === 'EXPIRÉE').length]];
   h += `<div class="chips">${F.map(([k, l, n]) => `<button class="chip ${S.iFiltre === k ? 'on' : ''}" data-act="ifiltre" data-f="${k}">${l}<small>${n}</small></button>`).join('')}</div>`;
   h += `<div class="rowline" style="justify-content:space-between;margin:6px 0 8px"><span class="muted" id="icount" style="font-size:12.5px"></span><button class="mini" data-act="bien-new">${ICON.plus}Ajouter un bien</button></div>`;
   h += `<div class="list" id="ilist">${listeBiens()}</div>`;
@@ -803,7 +805,7 @@ function listeBiens() {
   if (!L.length) return '<div class="empty">Aucun bien ne correspond</div>';
   return L.map(b => `<div class="item tap ${b.pending ? 'pending' : ''}" data-act="bien" data-id="${esc(b.id)}">
     <div class="grow"><div class="ttl">${esc(b.objet)}</div>${b.marque ? `<div class="desc">${esc(b.marque)}</div>` : ''}
-    <div class="meta">${pieceTag(b.piece)}${b.maif ? '<span class="badge maif">MAIF</span>' : ''}${b.garantie > 2 ? `<span class="badge star">★ ${esc(b.garantie)} ans</span>` : ''}${b.statut && b.statut !== 'COUVERTE' ? gStamp(b.statut) : ''}
+    <div class="meta">${pieceTag(b.piece)}${b.maif ? `<span class="badge maif">${AS_NOM}</span>` : ''}${b.garantie > 2 ? `<span class="badge star">★ ${esc(b.garantie)} ans</span>` : ''}${b.statut && b.statut !== 'COUVERTE' ? gStamp(b.statut) : ''}
     ${b.facture ? '<span class="badge">📄 facture</span>' : ''}${b.photo ? `<span class="badge">${esc(b.photoLabel || '📷 photo')}</span>` : '<span class="badge warn">sans photo</span>'}</div></div>
     <div class="when"><b>${b.prix ? e2(b.prix) : '<span class="badge warn">prix ?</span>'}</b>${b.date ? frCourt(b.date) + '/' + b.date.slice(2, 4) : ''}</div></div>`).join('');
 }
@@ -907,7 +909,7 @@ function ouvrirBien(id) {
       ${b.facture ? `<a class="go sec2" href="${hrefSur(b.facture)}" target="_blank" rel="noopener">${esc(b.factureLabel || '📄 Facture')}</a>` : `<span class="go sec2" style="opacity:.45">Pas de facture</span>`}
       ${b.photo ? `<a class="go sec2" href="${hrefSur(b.photo)}" target="_blank" rel="noopener">${esc(b.photoLabel || '📁 Photos')}</a>` : `<span class="go sec2" style="opacity:.45">Aucune photo</span>`}
     </div>
-    <button class="go ${b.maif ? 'maifon' : 'sec2'}" data-act="maif" ${b.row ? '' : 'disabled'}>${b.maif ? '✓ Dans le dossier MAIF (retirer)' : '🛡 Ajouter au dossier MAIF'}</button>
+    <button class="go ${b.maif ? 'maifon' : 'sec2'}" data-act="maif" ${b.row ? '' : 'disabled'}>${b.maif ? '✓ Dans le dossier ' + AS_DE + ' (retirer)' : '🛡 Ajouter au dossier ' + AS_DE}</button>
     <div id="photoBox"></div>
     <div class="btnrow"><button class="go" data-act="photo" ${b.row ? '' : 'disabled'}>📷 Prendre</button><button class="go" data-act="photo-gal" ${b.row ? '' : 'disabled'}>🖼 Galerie</button></div>
     <button class="go sec2" data-act="bien-edit">✎ Modifier la fiche</button>`);
@@ -1005,7 +1007,7 @@ function ouvrirLudo() {
     <div class="search">${ICON.search}<input id="lq" type="search" placeholder="Chercher un jeu, un éditeur…" value="${esc(S.lq)}"></div>
     <div class="chips">${F.filter(f => f[2] || !f[0]).map(([k, l, n]) => `<button class="chip ${S.lf === k ? 'on' : ''}" data-act="lfiltre" data-f="${k}">${l}<small>${n}</small></button>`).join('')}</div>
     <div class="list" id="llist">${listeJeux()}</div>
-    <button class="go sec2" data-act="export-ludo">📄 Exporter la ludothèque (PDF / Word)</button>
+    ${EST_T3 ? '<button class="go sec2" data-act="export-ludo">📄 Exporter la ludothèque (PDF / Word)</button>' : ''}
     <div class="note">Liste tenue à jour depuis MyLudo : réexporte ta ludothèque et dépose le fichier dans le Drive (MyLudo (exports)).</div>`);
 }
 function listeJeux() {
@@ -1121,7 +1123,7 @@ function basculerMaif() {
   b.maif = !b.maif;
   enfiler({ op: 'call', action: 'inv-maif', payload: { row: b.row, attendu: { objet: b.srvObjet || b.objet }, maif: b.maif } });
   ouvrirBien(b.id); rendre(true);
-  toast(b.maif ? '🛡 Ajouté au dossier MAIF' : 'Retiré du dossier MAIF');
+  toast(b.maif ? '🛡 Ajouté au dossier ' + AS_DE : 'Retiré du dossier ' + AS_DE);
 }
 
 /* ---------- export du dossier (PDF / Word) ---------- */
@@ -1576,7 +1578,7 @@ function aFaire() {
   const P = I.filter(b => b.categorie !== 'Travaux' && b.piece !== 'Salle ciné' && !b.photo);
   if (P.length) out.push({ scene: 'photo', niv: 'ok', titre: P.length + ' bien' + (P.length > 1 ? 's' : '') + ' sans photo', sous: "Utile pour l'assurance, et vers le trophée Paparazzi", quand: '', act: 'aff-photos', piece: '', bouton: '📷 Voir' });
   E.filter(t => t.etat === 'BIENTÔT' && t.jours > 7).sort(ordreUrg).slice(0, 3).forEach(t => tache(t, 'plus-tard'));
-  if (!out.length) out.push({ scene: 'cine', niv: 'relache', titre: 'Relâche ce soir 🍿', sous: 'Tout est à jour : séance libre dans la salle ciné', quand: '', ecran: 'RELÂCHE' });
+  if (!out.length) out.push({ scene: 'cine', niv: 'relache', titre: 'Relâche ce soir 🍿', sous: EST_T3 ? 'Tout est à jour : séance libre dans la salle ciné' : 'Tout est à jour, profite de ta soirée', quand: '', ecran: 'RELÂCHE' });
   return out.slice(0, 8);
 }
 
@@ -1757,8 +1759,8 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
   if (inv) h += bloc('L\'inventaire', [
     ['🛋️ Les biens', 'Chaque objet de l\'appartement avec sa pièce, son prix, sa facture et ses photos. Cherche par objet, marque ou magasin.'],
     ['🛡 Garanties', 'Une alerte apparaît quand une garantie finit dans moins de 30 jours, et un mail part une seule fois : teste l\'appareil à fond avant la fin.'],
-    ['📊 Plafond MAIF', 'La jauge compare la valeur du mobilier (hors travaux) au plafond assuré. À 95 %, un mail te prévient d\'en demander le relèvement.'],
-    ['📄 Dossier assurance', 'Coche les biens importants (« Ajouter au dossier MAIF »), puis « Dossier pour l\'assurance » : un PDF et un Word avec fiches, photos et factures. Il se fabrique en arrière-plan, un mail arrive avec les liens.']
+    (EST_T3 || (S.d && S.d.plafond)) && ['📊 Plafond ' + AS_DE, 'La jauge compare la valeur du mobilier (hors travaux) au plafond assuré. À 95 %, un mail te prévient d\'en demander le relèvement.'],
+    EST_T3 && ['📄 Dossier assurance', 'Coche les biens importants (« Ajouter au dossier MAIF »), puis « Dossier pour l\'assurance » : un PDF et un Word avec fiches, photos et factures. Il se fabrique en arrière-plan, un mail arrive avec les liens.']
   ]);
   if (mod('contacts')) h += bloc('Les contacts', [['📇 Contacts', 'Sur l\'accueil : plombier, SAV, syndic… Les boutons appellent ou écrivent directement. Toucher un contact permet de le modifier ; le supprimer demande deux appuis.']]);
   h += bloc('Sans réseau', [
@@ -1772,8 +1774,8 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
     ['📒 Plusieurs carnets', 'Chaque carnet garde ses propres données et ses saisies en attente : rien ne passe d\'un carnet à l\'autre. Les carnets déjà ouverts sur le téléphone sont dans Réglages, pour passer de l\'un à l\'autre.']
   ]);
   h += bloc('Le jeu', [
-    ['🎬 À l\'affiche', 'En haut de l\'accueil : la chose la plus urgente à faire, avec la scène de sa zone. En retard, le décor se dégrade ; ‹ › pour voir les suivantes. Quand tout est à jour : relâche, la salle ciné est à toi.'],
-    ['🐟 Aquarium', 'Un poisson par trophée gagné. L\'eau se trouble quand des tâches sont en retard. Le filtre fait des bulles, sauf si l\'entretien de l\'aquarium est en retard.'],
+    ['🎬 À l\'affiche', 'En haut de l\'accueil : la chose la plus urgente à faire, avec la scène de sa zone. En retard, le décor se dégrade ; ‹ › pour voir les suivantes. Quand tout est à jour : relâche' + (EST_T3 ? ', la salle ciné est à toi.' : ' !')],
+    ['🐟 Aquarium', 'Un poisson par trophée gagné. L\'eau se trouble quand des tâches sont en retard. ' + (EST_T3 ? 'Le filtre fait des bulles, sauf si l\'entretien de l\'aquarium est en retard.' : '')],
     ['🔥 Série', 'Nombre de semaines d\'affilée (du lundi au dimanche) sans aucune tâche en retard.'],
     ['🎞 Pellicule', 'Un photogramme par mois : ★ si le mois entier s\'est passé sans retard, sinon la part des jours sans retard.'],
     ['🏆 Trophées', 'Calculés à partir de ton historique' + (inv ? ' et de l\'inventaire' : '') + '. Une fois gagné, un trophée reste gagné. Touche un trophée pour voir comment l\'obtenir.'],
@@ -1790,7 +1792,7 @@ function ouvrirReglages() {
   S.form = { mode: 'reglages' };
   ouvrir(tete('Réglages') + `
     <div class="kv">
-      <div>Mail d'échéance</div><div>${sv.mailPause ? '⏸ en pause tant que le fichier est chez Théo' : sv.mailActif ? '✅ actif · une seule fois par tâche, le matin de son échéance' : ESSAI ? 'aucun mail dans le carnet d\'essai' : '⚠️ inactif : lance « installer » dans Apps Script'}</div>
+      <div>Mail d'échéance</div><div>${sv.mailPause ? (EST_T3 ? '⏸ en pause tant que le fichier est chez Théo' : '⏸ en pause pour l\'instant') : sv.mailActif ? '✅ actif · une seule fois par tâche, le matin de son échéance' : ESSAI ? 'aucun mail dans le carnet d\'essai' : EST_T3 ? '⚠️ inactif : lance « installer » dans Apps Script' : '⚠️ inactif'}</div>
       <div>Envoyé à</div><div>${esc(sv.destinataire || '—')}</div>
       <div>Dernier mail</div><div class="mono">${sv.dernierMail ? new Date(sv.dernierMail).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'aucun pour l\'instant'}</div>
       <div>Écritures</div><div>${S.queue.length ? S.queue.length + ' en attente d\'envoi' : 'tout est enregistré'}</div>
@@ -1853,12 +1855,12 @@ function apiEssai(action, x) {
   const r = LS.get('essaiRow', 500) + 1; LS.set('essaiRow', r);
   return action === 'inv-save' ? { ok: true, row: x.row || r, bien: Object.assign({}, x.bien, { row: x.row || r }) } : { ok: true, row: x.row || r };   // comme le vrai script : le bien enregistré revient
 }
-function quitterEssai() {   // retour au carnet principal, ou au dernier autre carnet ouvert s'il n'y a pas de clé T3 sur le téléphone
+function quitterEssai() {   // 1.9.3 : retour au dernier carnet ouvert avec sa clé (sinon le carnet par défaut, ou « colle ton lien »)
   const c = connus(); delete c[ID_ESSAI]; LS.set('connus', c);
   try { Object.keys(localStorage).filter(k => k.startsWith(PFX + NS)).forEach(k => localStorage.removeItem(k)); } catch (e) {}   // tout l'espace de l'essai
-  const autre = Object.keys(c).find(id => id !== idDe(API_URL) && ID_OK.test(id));
   try { sessionStorage.setItem(PFX + 'apresEssai', '1'); } catch (e) {}
-  changerCarnet(!clesSurTel().includes(PFX + 'key') && autre ? urlDe(autre) : API_URL);
+  const d = LS.get('dernier', '');
+  changerCarnet(d && d !== ID_ESSAI && ID_OK.test(d) && c[d] ? urlDe(d) : API_URL);
 }
 /* 1.9.1 : un autre carnet ne peut pas se faire appeler comme le carnet principal (sinon on pourrait y taper la clé du T3) */
 function nomSur(n, id) {
@@ -1875,6 +1877,7 @@ function retenirCarnet() {   // 1.9 : carnets ouverts avec succès sur ce télé
   const c = connus(), id = idDe(URL_CARNET), n = nomSur(S.d && S.d.serveur && S.d.serveur.nom);
   c[id] = { nom: n || nomSur((c[id] || {}).nom) || (DEFAUT ? NOM_DEFAUT : '') };
   LS.set('connus', c);
+  if (!ESSAI) LS.set('dernier', id);   // 1.9.3 : « Quitter l'essai » ramène ici
 }
 function autresCarnets() {   // carnets déjà ouverts sur ce téléphone, sauf celui-ci
   const c = connus(), ici = idDe(URL_CARNET);
@@ -1888,7 +1891,7 @@ function proposerCarnet() {   // 1.9 (carnet-code) : « Ouvrir ce carnet ? » à
     <p class="muted" style="margin:6px 0 18px">Tu as ouvert le lien d'un autre carnet d'entretien. Il s'ouvrira avec sa propre clé ; ton carnet actuel (« ${esc(nomCarnet())} ») et ses données restent intacts sur ce téléphone.</p>
     <button class="go" id="pok">Ouvrir ce carnet</button>
     <button class="go sec2" id="pnon" style="margin-top:8px">Non, rester sur « ${esc(nomCarnet())} »</button></div>`;
-  $('#pok').addEventListener('click', () => { const c = connus(); c[id] = c[id] || { nom: '' }; LS.set('connus', c); changerCarnet(urlDe(id)); });
+  $('#pok').addEventListener('click', () => changerCarnet(urlDe(id)));   // 1.9.3 : mémorisé seulement après une clé acceptée
   $('#pnon').addEventListener('click', () => { CARNET_PROPOSE = ''; if (!S.key) verrouiller(); else { l.hidden = true; if (avant === false) verrouiller(); } });
 }
 function partagerLien() {   // 1.9 : partage du lien d'installation (SMS, WhatsApp, mail…) ; copie si le partage n'existe pas
@@ -1941,7 +1944,6 @@ function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai 
     const id = lireLien($('#kurl').value);
     if (!id) { $('#kerr').textContent = 'Ce lien ne mène pas à un carnet. Colle le lien reçu par message.'; return; }
     if (urlDe(id) === URL_CARNET) { $('#kerr').textContent = 'C\'est déjà ce carnet : il ne reste que la clé.'; $('#kzone').hidden = true; $('#klien').hidden = false; return; }
-    const c = connus(); c[id] = c[id] || { nom: '' }; LS.set('connus', c);   // collé à la main : pas de « Ouvrir ce carnet ? » en plus
     changerCarnet(urlDe(id));
   });
   if ($('#kdef')) $('#kdef').addEventListener('click', () => changerCarnet(API_URL));
