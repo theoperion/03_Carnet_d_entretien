@@ -760,7 +760,9 @@ function ouvrirTacheNew() {
 const dejaFaite = el => histo().some(h => norm(h.element) === norm(el));
 function ouvrirTacheEdit(el) {   // 1.9.5 : modifier / supprimer une tâche (nom et suppression seulement si aucun passage)
   const t = S.d.entretien.find(x => x.element === el); if (!t) return;
-  S.form = { mode: 'tache', edit: t.id, v: { zone: t.zone, element: t.element, intervention: t.intervention || '', freq: t.freq || 6, outils: t.outils || '' }, zoneNeuve: false, nomFige: dejaFaite(t.element) };
+  // nom figé seulement si un passage de cette tâche attend encore le réseau (sinon le script renomme aussi l'historique)
+  const enAttente = S.queue.some(o => (o.op === 'fait' || o.op === 'maj') ? (S.d.historique.find(h => h.id === o.id) || o.h || {}).element === t.element : o.op === 'annuler' && o.attendu && o.attendu.element === t.element);
+  S.form = { mode: 'tache', edit: t.id, v: { zone: t.zone, element: t.element, intervention: t.intervention || '', freq: t.freq || 6, outils: t.outils || '' }, zoneNeuve: false, nomFige: enAttente, aPassages: dejaFaite(t.element) };
   rendreTacheNew();
 }
 function rendreTacheNew() {
@@ -771,15 +773,15 @@ function rendreTacheNew() {
       <button class="chip ${f.zoneNeuve ? 'on' : ''}" data-act="t-zone-neuve">＋ Nouvelle zone</button></div>
     ${f.zoneNeuve ? `<input class="field" id="t-zone" value="${esc(v.zone)}" placeholder="Ex. Jardin" maxlength="40">` : ''}
     <div class="lbl">Élément *</div><input class="field" id="t-element" value="${esc(v.element)}" placeholder="Ex. Chaudière" maxlength="80" ${f.nomFige ? 'readonly style="opacity:.6"' : ''}>
-    ${f.nomFige ? '<div class="muted" style="font-size:12px;margin-top:3px">Des passages sont notés : le nom reste le même (l\'historique y est rattaché).</div>' : ''}
+    ${f.nomFige ? '<div class="muted" style="font-size:12px;margin-top:3px">Un passage de cette tâche attend le réseau : tu pourras la renommer quand il sera parti.</div>' : f.edit && f.aPassages ? '<div class="muted" style="font-size:12px;margin-top:3px">Ses passages déjà notés suivront le nouveau nom.</div>' : ''}
     <div class="lbl">Ce qu'il faut faire</div><textarea class="field" id="t-intervention" placeholder="Ex. Faire l'entretien annuel" maxlength="300">${esc(v.intervention)}</textarea>
     <div class="lbl">Tous les…</div><div class="chips wrap">${FREQS.map(n => `<button class="chip ${+v.freq === n ? 'on' : ''}" data-act="t-freq" data-v="${n}">${n === 12 ? '1 an' : n === 24 ? '2 ans' : n + ' mois'}</button>`).join('')}</div>
     <div class="lbl">Outillage & produits <span style="text-transform:none;letter-spacing:0">(facultatif)</span></div><input class="field" id="t-outils" value="${esc(v.outils)}" maxlength="200">
     ${f.edit ? '' : '<div class="note">Elle apparaîtra en « Jamais faite » : note son premier passage avec FAIT, la prochaine date se calculera seule.</div>'}
     <div class="err" id="t-err"></div>
     <button class="go" data-act="t-save">${f.edit ? 'Enregistrer' : '＋ Ajouter la tâche'}</button>
-    ${f.edit && !f.nomFige ? `<button class="go danger ${f.arm ? 'armed' : ''}" data-act="t-del">${f.arm ? 'Confirmer la suppression' : 'Supprimer cette tâche'}</button>` : ''}
-    ${f.edit && f.nomFige ? '<div class="muted" style="font-size:12px;margin-top:8px">Une tâche qui a des passages ne se supprime que dans le fichier (pour garder son historique).</div>' : ''}`);
+    ${f.edit && !f.aPassages ? `<button class="go danger ${f.arm ? 'armed' : ''}" data-act="t-del">${f.arm ? 'Confirmer la suppression' : 'Supprimer cette tâche'}</button>` : ''}
+    ${f.edit && f.aPassages ? '<div class="muted" style="font-size:12px;margin-top:8px">Elle a déjà des passages notés : elle ne se supprime pas ici, pour ne pas perdre son historique.</div>' : ''}`);
 }
 function lireTacheForm() {
   const v = S.form.v; ['element', 'intervention', 'outils'].forEach(k => { const e = $('#t-' + k); if (e) v[k] = e.value.trim(); });
@@ -789,7 +791,8 @@ function modifierTache(t, champs) {
   const creation = S.queue.findIndex(o => o.action === 'tache-save' && o.id === t.id);
   if (creation === 0 && S.busy) { $('#t-err').textContent = 'Envoi en cours : réessaie dans un instant'; return; }
   if (!t.row && creation < 0) { $('#t-err').textContent = 'Envoi en cours : réessaie dans un instant'; return; }
-  const avant = t.srvEl || t.element;
+  const avant = t.srvEl || t.element, ancien = t.element;
+  if (champs.element !== ancien) S.d.historique.forEach(h => { if (h.element === ancien) { h.element = champs.element; if (h.srv) h.srv.element = champs.element; } });   // le script renomme aussi ses passages
   Object.assign(t, champs, { freqTxt: freqTxt(champs.freq), pending: true });
   if (t.dernier) recalc(t);
   if (creation >= 0) S.queue[creation].payload.tache = champs;   // pas encore envoyée : on corrige la création
@@ -797,7 +800,12 @@ function modifierTache(t, champs) {
   sauver(); fermer(); rendre(true); toast('Tâche modifiée');
 }
 function supprimerTache() {
-  const f = S.form; if (!f.arm) { lireTacheForm(); f.arm = true; rendreTacheNew(); return; }
+  const f = S.form;
+  if (!f.arm) {   // 1er appui : on reste au même endroit, le bouton de confirmation reste visible
+    lireTacheForm(); const sc = $('#sheet').scrollTop; f.arm = true; f.armAt = Date.now(); rendreTacheNew(); $('#sheet').scrollTop = sc;
+    const b = document.querySelector('[data-act="t-del"]'); if (b) b.scrollIntoView({ block: 'nearest' }); return;
+  }
+  if (Date.now() - (f.armAt || 0) < 600) return;   // double appui trop rapide : ignoré
   const t = S.d.entretien.find(x => x.id === f.edit); if (!t) return fermer();
   const creation = S.queue.findIndex(o => o.action === 'tache-save' && o.id === t.id);
   if ((creation === 0 && S.busy) || (!t.row && creation < 0)) { $('#t-err').textContent = 'Envoi en cours : réessaie dans un instant'; return; }
@@ -1852,7 +1860,7 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
     ['🚦 Les états', '<b>En retard</b> dès le lendemain de la date prévue · <b>Sous 30 jours</b> : à caler dans l\'agenda · <b>RAS</b> : rien à signaler · <b>Jamais faites</b> : à planifier une 1re fois.'],
     ['✉️ Le mail', 'Le matin où une tâche arrive à échéance, un mail part, <b>une seule fois</b> : jamais de relance. La tâche reste en retard dans l\'appli jusqu\'à « C\'est fait ».'],
     ['📒 Historique', 'Tous les passages notés. Touche un passage pour corriger sa date ou sa durée, ou le supprimer (il faut toucher deux fois).'],
-    peutAjouter() && ['＋ Nouvelle tâche', 'En bas de l\'onglet Entretien : « Ajouter une tâche » (zone, élément, ce qu\'il faut faire, fréquence en mois). Elle arrive en « Jamais faite » ; note son premier passage avec FAIT. Pour la corriger : touche-la, « Modifier la tâche » (elle se supprime tant qu\'aucun passage n\'est noté).'],
+    peutAjouter() && ['＋ Nouvelle tâche', 'En bas de l\'onglet Entretien : « Ajouter une tâche » (zone, élément, ce qu\'il faut faire, fréquence en mois). Elle arrive en « Jamais faite » ; note son premier passage avec FAIT. Pour la corriger : touche-la, « Modifier la tâche » (même son nom ; elle se supprime tant qu\'aucun passage n\'est noté).'],
     mod('consommables') && ['🧴 Consommables', 'Dans l\'onglet Entretien : les produits d\'entretien et ce qu\'il reste à racheter.']
   ]);
   if (inv) h += bloc('L\'inventaire', [
