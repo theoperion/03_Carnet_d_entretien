@@ -645,7 +645,7 @@ async function pomper() {
     return;
   }
   S.queue.shift();
-  if (res.tache) { const t = S.d.entretien.find(x => x.element === res.tache.element); if (t && !S.queue.some(o => o.op === 'fait' || o.op === 'maj')) Object.assign(t, res.tache); }
+  if (res.tache && op.after !== 'tache') { const t = S.d.entretien.find(x => x.element === res.tache.element); if (t && !S.queue.some(o => o.op === 'fait' || o.op === 'maj' || (o !== op && o.after === 'tache' && o.id === t.id))) Object.assign(t, res.tache); }   // 1.9.5 : les envois de tâche sont gérés par apresAppel
   sauver(); rendre(true); pomper();
 }
 function apresAppel(op, res) {
