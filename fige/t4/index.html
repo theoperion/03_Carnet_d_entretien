@@ -658,7 +658,7 @@ function rendre(silencieux) {
   if (S.tab === 'inventaire' && !mod('inventaire')) S.tab = 'bord';
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.act === 'tab:' + S.tab));
   const T = { bord: [nomCarnet(), 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], inventaire: ['Inventaire', 'Assurance MAIF · biens, factures, photos'] }[S.tab];
-  $('#htitle').textContent = T[0]; $('#hsub').textContent = (DEFAUT || FIGE || S.tab === 'bord' ? '' : '📒 ' + nomCarnet() + ' · ') + T[1];   // 1.9 : on voit toujours dans quel carnet on est
+  $('#htitle').textContent = T[0]; $('#hsub').textContent = (DEFAUT || (FIGE && !FIGE.id) || S.tab === 'bord' ? '' : '📒 ' + nomCarnet() + ' · ') + T[1];   // 1.9 : on voit toujours dans quel carnet on est
   const y = scrollY;
   $('#main').innerHTML = `<div class="view">${({ bord: vBord, entretien: vEntretien, histo: vHisto, inventaire: vInventaire })[S.tab]()}</div>`;
   if (silencieux) scrollTo(0, y);
@@ -1869,7 +1869,7 @@ function nomSur(n, id) {
 }
 function nomCarnet() {   // 1.9 : le script peut donner un nom (serveur.nom) ; sinon « Carnet · T3 » pour le carnet principal
   const n = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);
-  return n || (DEFAUT ? NOM_DEFAUT : FIGE ? 'Mon carnet' : 'Autre carnet');
+  return n || (DEFAUT ? NOM_DEFAUT : 'Autre carnet');
 }
 function retenirCarnet() {   // 1.9 : carnets ouverts avec succès sur ce téléphone (nom affiché, pas de question au prochain lien)
   const c = connus(), id = idDe(URL_CARNET), n = nomSur(S.d && S.d.serveur && S.d.serveur.nom);
@@ -1901,7 +1901,7 @@ function partagerLien() {   // 1.9 : partage du lien d'installation (SMS, WhatsA
 /* ================= VERROU ================= */
 function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai reçu un lien de carnet » ouvert depuis les Réglages
   if (SANS_CARNET) lienSeul = true;   // 1.9.3 : version commune au 1er lancement : on commence par le lien de SON carnet
-  /* 1.9 (carnet-utilisateur) : écran neutre. Sur iPhone, l'appli installée oublie le lien : Carla peut tomber sur le carnet
+  /* 1.9 (carnet-utilisateur) : écran neutre. Sur iPhone, l'appli installée oublie le lien : on peut tomber sur le carnet
      principal ; elle doit comprendre tout de suite que ce n'est pas le sien et trouver « J'ai reçu un lien de carnet ». */
   const l = $('#lock'); l.hidden = false;
   const peutAnnuler = annulable && S.key && S.d;

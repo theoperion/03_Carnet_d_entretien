@@ -5,7 +5,7 @@ importScripts('version.js');   // un changement de numéro dans version.js renou
 const CACHE = 'carnet-t3-' + ((self.CARNET_VERSION || {}).app || '0');
 const ASSETS = ['./', './index.html', './version.js', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => Promise.all(ASSETS.map(u => c.add(u).catch(() => null)))).then(() => self.skipWaiting())); });
-// 1.8.3 : ne nettoie que SES caches (carnet-t3-…) : Versus et le carnet de Carla, sur le même site, gardent leur hors connexion
+// 1.8.3 : ne nettoie que SES caches (carnet-t3-…) : Versus et les autres carnets, sur le même site, gardent leur hors connexion
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x.startsWith('carnet-t3-') && x !== CACHE).map(x => caches.delete(x)))).then(() => self.clients.claim()));
 });
