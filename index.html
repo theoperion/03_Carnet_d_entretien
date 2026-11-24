@@ -375,8 +375,12 @@ html[data-theme="nuit"] .tag,html[data-theme="cine"] .tag{filter:saturate(.85) b
 <script src="version.js"></script>
 <script>
 /* ================= CONFIG ================= */
-// Carnet par défaut (celui de Théo). Un autre carnet s'ouvre par son lien d'installation …/#s=<id du script>.
-const API_URL = 'https://script.google.com/macros/s/AKfycbwsDzmjF3b4PLGZkLthvBPz9nFj_FIQZQOYNMTvDaFgAS8nYkpoOk18S94G_va4QJnnxQ/exec';
+// 1.9.2 : copie figée (dossier fige/…, fabriquée par outils/figer.py) : { dossier, id, nom }. null = l'appli normale de Théo.
+const FIGE = null;
+// Carnet par défaut (celui de Théo, ou celui de la copie figée). Un autre carnet s'ouvre par son lien …/#s=<id du script>.
+const API_URL = FIGE ? 'https://script.google.com/macros/s/' + FIGE.id + '/exec' : 'https://script.google.com/macros/s/AKfycbwsDzmjF3b4PLGZkLthvBPz9nFj_FIQZQOYNMTvDaFgAS8nYkpoOk18S94G_va4QJnnxQ/exec';
+const PFX = FIGE ? 'cf-' + FIGE.dossier + '.' : 'carnet.';   // données du téléphone : une copie figée ne touche jamais à celles de l'appli normale
+const NOM_DEFAUT = FIGE ? FIGE.nom : 'Carnet · T3';
 /* 1.9 : plusieurs carnets dans la même appli. Chaque carnet garde SES données sur le téléphone (clé, file d'attente,
    copie locale) sous un préfixe propre : une saisie ne peut jamais partir vers le script d'un autre carnet.
    Le carnet par défaut garde les noms d'avant (carnet.key, carnet.queue, carnet.cache) : rien à migrer. */
@@ -387,12 +391,12 @@ const lireLien = s => { s = String(s || '').trim(); const m = /[#&]s=([A-Za-z0-9
 /* 1.9 (carnet-code) : un lien inconnu ne fait plus changer de carnet sans demander, dès qu'une clé existe sur le téléphone
    (un faux carnet ne doit jamais pouvoir s'ouvrir à la place du vrai sans que la personne le voie). */
 const nsDe = id => id === idDe(API_URL) ? '' : 'c' + Array.from(id).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36) + '.';
-const clesSurTel = () => { try { return Object.keys(localStorage).filter(k => /^carnet\.(c[0-9a-z]+\.)?key$/.test(k) && JSON.parse(localStorage.getItem(k) || '""') && JSON.parse(localStorage.getItem(k)) !== 'essai'); } catch (e) { return []; } };
-const connus = () => { try { const c = JSON.parse(localStorage.getItem('carnet.connus') || '{}'); return c && typeof c === 'object' ? c : {}; } catch (e) { return {}; } };
+const clesSurTel = () => { try { return Object.keys(localStorage).filter(k => k.startsWith(PFX) && /^(c[0-9a-z]+\.)?key$/.test(k.slice(PFX.length)) && JSON.parse(localStorage.getItem(k) || '""') && JSON.parse(localStorage.getItem(k)) !== 'essai'); } catch (e) { return []; } };
+const connus = () => { try { const c = JSON.parse(localStorage.getItem(PFX + 'connus') || '{}'); return c && typeof c === 'object' ? c : {}; } catch (e) { return {}; } };
 const ID_ESSAI = 'carnet_essai_exemple_2026';   // 1.9.1 : carnet d'essai, entièrement dans le téléphone (aucun script, aucun envoi)
 let CARNET_PROPOSE = '';   // id d'un carnet reçu par lien, en attente de « Ouvrir ce carnet ? »
 function arriveeLien(id) {   // renvoie true si on peut ouvrir tout de suite (carnet déjà connu, ou aucune clé à protéger)
-  let actuel = API_URL; try { actuel = JSON.parse(localStorage.getItem('carnet.url') || 'null') || API_URL; } catch (e) {}
+  let actuel = API_URL; try { actuel = JSON.parse(localStorage.getItem(PFX + 'url') || 'null') || API_URL; } catch (e) {}
   if (urlDe(id) === actuel) return false;
   if (id === idDe(API_URL) || id === ID_ESSAI || connus()[id] || !clesSurTel().length) return true;
   CARNET_PROPOSE = id; return false;
@@ -400,10 +404,11 @@ function arriveeLien(id) {   // renvoie true si on peut ouvrir tout de suite (ca
 (function () {   // lien d'installation : lu et effacé AVANT tout le reste (historique, bouton retour)
   const id = lireLien(location.hash);
   if (location.hash) try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
-  if (id && arriveeLien(id)) try { if (id === idDe(API_URL)) localStorage.removeItem('carnet.url'); else localStorage.setItem('carnet.url', JSON.stringify(urlDe(id))); } catch (e) {}
+  if (id && arriveeLien(id)) try { if (id === idDe(API_URL)) localStorage.removeItem(PFX + 'url'); else localStorage.setItem(PFX + 'url', JSON.stringify(urlDe(id))); } catch (e) {}
 })();
-const URL_CARNET = (function () { try { const u = JSON.parse(localStorage.getItem('carnet.url') || 'null'); return idDe(u) ? u : API_URL; } catch (e) { return API_URL; } })();
+const URL_CARNET = (function () { try { const u = JSON.parse(localStorage.getItem(PFX + 'url') || 'null'); return idDe(u) ? u : API_URL; } catch (e) { return API_URL; } })();
 const DEFAUT = URL_CARNET === API_URL, ESSAI = idDe(URL_CARNET) === ID_ESSAI;
+const EST_T3 = DEFAUT && !FIGE;   // le carnet T3 de Théo (aquarium, salle ciné, inventaire complet)
 const NS = nsDe(idDe(URL_CARNET));
 const COMMUN = { theme: 1, tab: 1, url: 1, connus: 1 };   // réglages communs à tous les carnets du téléphone
 const lienCarnet = () => location.origin + location.pathname + '#s=' + idDe(URL_CARNET);
@@ -416,7 +421,7 @@ function changerCarnet(u) {
   // 1.9 (carnet-code) : des saisies de ce carnet attendent encore le réseau → on prévient (elles partiront au retour sur ce carnet)
   const n = typeof S !== 'undefined' && S.queue ? S.queue.filter(o => !o.facultatif).length : 0;
   if (n && !confirm((n > 1 ? n + ' saisies de ce carnet attendent encore le réseau. Elles partiront' : '1 saisie de ce carnet attend encore le réseau. Elle partira') + ' quand tu reviendras sur ce carnet.\n\nChanger de carnet quand même ?')) return;
-  try { if (u === API_URL) localStorage.removeItem('carnet.url'); else localStorage.setItem('carnet.url', JSON.stringify(u)); } catch (e) {} location.reload(); }
+  try { if (u === API_URL) localStorage.removeItem(PFX + 'url'); else localStorage.setItem(PFX + 'url', JSON.stringify(u)); } catch (e) {} location.reload(); }
 // 1.8.6 : l'adresse du Sheet n'est plus écrite ici (dépôt public) : le script la donne après la clé
 const sheetUrl = () => (S.d && S.d.serveur && /^https:\/\/docs\.google\.com\//.test(S.d.serveur.sheetUrl || '')) ? S.d.serveur.sheetUrl : '';
 const VERSION = (self.CARNET_VERSION || {}).app || '?';   // le numéro se change dans version.js
@@ -424,7 +429,7 @@ const VERSION = (self.CARNET_VERSION || {}).app || '?';   // le numéro se chang
 /* ================= OUTILS ================= */
 const $ = s => document.querySelector(s);
 const LS = {
-  n(k) { return 'carnet.' + (COMMUN[k] && !(ESSAI && k === 'theme') ? '' : NS) + k; },   // 1.9.1 : le thème choisi dans l'essai ne touche pas au vrai carnet
+  n(k) { return PFX + (COMMUN[k] && !(ESSAI && k === 'theme') ? '' : NS) + k; },   // 1.9.1 : le thème choisi dans l'essai ne touche pas au vrai carnet
   get(k, d) { try { const v = localStorage.getItem(LS.n(k)); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(LS.n(k), JSON.stringify(v)); } catch (e) {} },
   del(k) { try { localStorage.removeItem(LS.n(k)); } catch (e) {} }
@@ -1339,10 +1344,10 @@ function trophees() {
     { id: 'ordre', ic: '✅', nom: 'Tout est en ordre', desc: 'Aucune tâche en retard', prog: [E.filter(t => t.etat !== 'EN RETARD').length, E.length] },
     { id: 'tour', ic: '🗺️', nom: 'Tour du propriétaire', desc: 'Chaque tâche du carnet faite au moins une fois', prog: [E.filter(t => t.dernier).length, E.length] },
     { id: 'pyro', ic: '♨️', nom: 'Pyromane', desc: 'Lancer une pyrolyse du four', prog: [H.some(h => /^four\b/i.test(h.element)) ? 1 : 0, 1] },
-    { id: 'aqua', ic: '🐠', nom: 'Aquariophile', desc: "3 entretiens d'aquarium d'affilée faits à l'heure", prog: [suiteAquarium(), 3], si: DEFAUT },
-    { id: 'aqua', ic: '🚿', nom: 'Eau claire', desc: 'Chaque tâche Salle de bain et WC faite au moins une fois', prog: zoneFaite(/salle de bain|wc/i), si: !DEFAUT },
-    { id: 'cine', ic: '🎬', nom: 'Projectionniste', desc: 'Tous les biens de la salle ciné en photo', prog: [cine.filter(b => b.photo).length, cine.length], si: DEFAUT },
-    { id: 'cine', ic: '🍳', nom: 'Chef de cuisine', desc: 'Chaque tâche Cuisine faite au moins une fois', prog: zoneFaite(/cuisine/i), si: !DEFAUT },
+    { id: 'aqua', ic: '🐠', nom: 'Aquariophile', desc: "3 entretiens d'aquarium d'affilée faits à l'heure", prog: [suiteAquarium(), 3], si: EST_T3 },
+    { id: 'aqua', ic: '🚿', nom: 'Eau claire', desc: 'Chaque tâche Salle de bain et WC faite au moins une fois', prog: zoneFaite(/salle de bain|wc/i), si: !EST_T3 },
+    { id: 'cine', ic: '🎬', nom: 'Projectionniste', desc: 'Tous les biens de la salle ciné en photo', prog: [cine.filter(b => b.photo).length, cine.length], si: EST_T3 },
+    { id: 'cine', ic: '🍳', nom: 'Chef de cuisine', desc: 'Chaque tâche Cuisine faite au moins une fois', prog: zoneFaite(/cuisine/i), si: !EST_T3 },
     { id: 'serie4', ic: '🔥', nom: 'Sur la lancée', desc: "4 semaines d'affilée sans retard", prog: [sr.best, 4] },
     { id: 'mois', ic: '📅', nom: 'Mois parfait', desc: 'Un mois entier sans aucun retard', prog: [parfaits, 1] },
     { id: 'papa', ic: '📸', nom: 'Paparazzi', desc: "Tout l'inventaire en photo (hors travaux)", prog: [I.filter(b => b.photo).length, I.length], si: inv },
@@ -1737,7 +1742,7 @@ function ouvrirTrophee(id) {
 }
 function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulement le jeu)
   S.form = { mode: 'aide', depuis: depuis || 'trophees' };
-  const d = S.d || {}, inv = mod('inventaire') && !!((d.inventaire || []).length || ((d.listes || {}).pieces || []).length || !DEFAUT);
+  const d = S.d || {}, inv = mod('inventaire') && !!((d.inventaire || []).length || ((d.listes || {}).pieces || []).length || !EST_T3);
   const bloc = (titre, lignes) => `<div class="lbl">${titre}</div><div class="kv">${lignes.filter(Boolean).map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join('')}</div>`;
   let h = bloc('L\'entretien', [
     ['🔧 Les tâches', 'Chaque tâche a une fréquence (tous les 3 mois, tous les ans…). Le carnet calcule la prochaine date à partir du dernier passage.'],
@@ -1783,7 +1788,7 @@ function ouvrirReglages() {
   S.form = { mode: 'reglages' };
   ouvrir(tete('Réglages') + `
     <div class="kv">
-      <div>Mail d'échéance</div><div>${sv.mailActif ? '✅ actif · une seule fois par tâche, le matin de son échéance' : ESSAI ? 'aucun mail dans le carnet d\'essai' : '⚠️ inactif : lance « installer » dans Apps Script'}</div>
+      <div>Mail d'échéance</div><div>${sv.mailPause ? '⏸ en pause tant que le fichier est chez Théo' : sv.mailActif ? '✅ actif · une seule fois par tâche, le matin de son échéance' : ESSAI ? 'aucun mail dans le carnet d\'essai' : '⚠️ inactif : lance « installer » dans Apps Script'}</div>
       <div>Envoyé à</div><div>${esc(sv.destinataire || '—')}</div>
       <div>Dernier mail</div><div class="mono">${sv.dernierMail ? new Date(sv.dernierMail).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'aucun pour l\'instant'}</div>
       <div>Écritures</div><div>${S.queue.length ? S.queue.length + ' en attente d\'envoi' : 'tout est enregistré'}</div>
@@ -1808,7 +1813,7 @@ function ouvrirReglages() {
    ajouter son 1er bien). L'entretien est toujours là. */
 const ID_T4 = 'AKfycbysEJTeMDjtS2WHicGgse_l9PJ0h6NL7mYTExIOTW1_aHGp31UzkBzhhTmnsFg1NXsy';
 function mod(m) {
-  if (m === 'entretien' || DEFAUT) return true;   // le carnet principal T3 a toujours tout
+  if (m === 'entretien' || EST_T3) return true;   // le carnet principal T3 a toujours tout
   const sm = S.d && S.d.serveur && S.d.serveur.modules;
   if (Array.isArray(sm)) return sm.includes(m);
   if (idDe(URL_CARNET) === ID_T4) return ['contacts', 'consommables'].includes(m);
@@ -1848,10 +1853,10 @@ function apiEssai(action, x) {
 }
 function quitterEssai() {   // retour au carnet principal, ou au dernier autre carnet ouvert s'il n'y a pas de clé T3 sur le téléphone
   const c = connus(); delete c[ID_ESSAI]; LS.set('connus', c);
-  try { Object.keys(localStorage).filter(k => k.startsWith('carnet.' + NS)).forEach(k => localStorage.removeItem(k)); } catch (e) {}   // tout l'espace de l'essai
+  try { Object.keys(localStorage).filter(k => k.startsWith(PFX + NS)).forEach(k => localStorage.removeItem(k)); } catch (e) {}   // tout l'espace de l'essai
   const autre = Object.keys(c).find(id => id !== idDe(API_URL) && ID_OK.test(id));
-  try { sessionStorage.setItem('carnet.apresEssai', '1'); } catch (e) {}
-  changerCarnet(!clesSurTel().includes('carnet.key') && autre ? urlDe(autre) : API_URL);
+  try { sessionStorage.setItem(PFX + 'apresEssai', '1'); } catch (e) {}
+  changerCarnet(!clesSurTel().includes(PFX + 'key') && autre ? urlDe(autre) : API_URL);
 }
 /* 1.9.1 : un autre carnet ne peut pas se faire appeler comme le carnet principal (sinon on pourrait y taper la clé du T3) */
 function nomSur(n, id) {
@@ -1862,16 +1867,16 @@ function nomSur(n, id) {
 }
 function nomCarnet() {   // 1.9 : le script peut donner un nom (serveur.nom) ; sinon « Carnet · T3 » pour le carnet principal
   const n = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);
-  return n || (DEFAUT ? 'Carnet · T3' : 'Autre carnet');
+  return n || (DEFAUT ? NOM_DEFAUT : 'Autre carnet');
 }
 function retenirCarnet() {   // 1.9 : carnets ouverts avec succès sur ce téléphone (nom affiché, pas de question au prochain lien)
   const c = connus(), id = idDe(URL_CARNET), n = nomSur(S.d && S.d.serveur && S.d.serveur.nom);
-  c[id] = { nom: n || nomSur((c[id] || {}).nom) || (DEFAUT ? 'Carnet · T3' : '') };
+  c[id] = { nom: n || nomSur((c[id] || {}).nom) || (DEFAUT ? NOM_DEFAUT : '') };
   LS.set('connus', c);
 }
 function autresCarnets() {   // carnets déjà ouverts sur ce téléphone, sauf celui-ci
   const c = connus(), ici = idDe(URL_CARNET);
-  if (!c[idDe(API_URL)] && clesSurTel().includes('carnet.key')) c[idDe(API_URL)] = { nom: 'Carnet · T3' };
+  if (!c[idDe(API_URL)] && clesSurTel().includes(PFX + 'key')) c[idDe(API_URL)] = { nom: NOM_DEFAUT };
   return Object.keys(c).filter(id => id !== ici && ID_OK.test(id)).map(id => ({ id, nom: nomSur(c[id].nom, id) || 'Autre carnet' }));
 }
 function proposerCarnet() {   // 1.9 (carnet-code) : « Ouvrir ce carnet ? » à l'arrivée d'un lien inconnu
@@ -1897,8 +1902,8 @@ function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai 
      principal ; elle doit comprendre tout de suite que ce n'est pas le sien et trouver « J'ai reçu un lien de carnet ». */
   const l = $('#lock'); l.hidden = false;
   const peutAnnuler = annulable && S.key && S.d;
-  const retourT3 = !DEFAUT && clesSurTel().includes('carnet.key');   // seulement si le carnet T3 a déjà été ouvert ici
-  let apresEssai = false; try { apresEssai = !!sessionStorage.getItem('carnet.apresEssai'); sessionStorage.removeItem('carnet.apresEssai'); } catch (e) {}
+  const retourT3 = !DEFAUT && clesSurTel().includes(PFX + 'key');   // seulement si le carnet T3 a déjà été ouvert ici
+  let apresEssai = false; try { apresEssai = !!sessionStorage.getItem(PFX + 'apresEssai'); sessionStorage.removeItem(PFX + 'apresEssai'); } catch (e) {}
   const aide = 'Pas ton carnet ? Touche « J\'ai reçu un lien de carnet » et colle le lien reçu par message.';
   const nomConnu = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);
   const titre = lienSeul ? 'J\'ai reçu un lien de carnet' : DEFAUT ? 'Carnet d\'entretien' : nomConnu ? esc(String(nomConnu).slice(0, 30)) : 'Carnet ouvert par lien';
@@ -1911,7 +1916,7 @@ function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai 
     <button class="go" id="kgo">Ouvrir le carnet</button>
     <button class="go sec2" id="klien" style="margin-top:14px">🔗 J'ai reçu un lien de carnet</button>
     <div id="kzone" hidden><input class="field" id="kurl" placeholder="Colle ici le lien reçu" autocomplete="off"><button class="go sec2" id="kok">Ouvrir ce lien</button></div>
-    ${retourT3 ? '<button class="go sec2" id="kdef" style="margin-top:6px">‹ Revenir au carnet T3</button>' : ''}
+    ${retourT3 ? `<button class="go sec2" id="kdef" style="margin-top:6px">‹ Revenir au carnet « ${esc(NOM_DEFAUT)} »</button>` : ''}
     ${peutAnnuler ? '<button class="go sec2" id="kann" style="margin-top:6px">‹ Annuler</button>' : ''}</div>`;
   l.dataset.annulable = peutAnnuler ? '1' : '';
   const go = $('#kgo');
@@ -2072,7 +2077,7 @@ charger = function (d) {
 } catch (e) {} })();
 idsLocaux();
 appliquerTheme(LS.get('theme', 'chantier'));
-if (S.key && !ESSAI) try { sessionStorage.removeItem('carnet.apresEssai'); } catch (e) {}
+if (S.key && !ESSAI) try { sessionStorage.removeItem(PFX + 'apresEssai'); } catch (e) {}
 if (ESSAI && !S.key) { S.key = 'essai'; LS.set('key', 'essai'); }
 if (!S.key || !apiUrl()) verrouiller(); else { rendre(); rafraichir(true); pomper(); }
 if (CARNET_PROPOSE) proposerCarnet();   // 1.9 : lien d'un carnet inconnu → on demande avant d'ouvrir

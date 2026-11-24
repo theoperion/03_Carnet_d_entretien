@@ -13,6 +13,7 @@ const delai = ms => new Promise((_, rej) => setTimeout(() => rej(new Error('lent
 self.addEventListener('fetch', e => {
   const req = e.request, u = new URL(req.url);
   if (req.method !== 'GET' || u.origin !== location.origin) return;
+  if (u.pathname.includes('/fige/')) return;   // 1.9.2 : les copies figées (fige/…) ont leur propre hors connexion
   const page = req.mode === 'navigate' || /\.(html|js)$/.test(u.pathname) || u.pathname.endsWith('/');
   const frais = fetch(req, { cache: 'no-cache' }).then(r => { if (r && r.ok) { const copie = r.clone(); return caches.open(CACHE).then(c => c.put(req, copie)).then(() => r); } return r; });
   e.waitUntil(frais.catch(() => null));   // la nouvelle version est gardée même si elle arrive tard
