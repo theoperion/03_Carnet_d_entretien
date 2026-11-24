@@ -410,7 +410,11 @@ window.addEventListener('hashchange', () => {   // lien ouvert alors que l'appli
   try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
   if (arriveeLien(id)) changerCarnet(urlDe(id)); else if (CARNET_PROPOSE) proposerCarnet();
 });
-function changerCarnet(u) { try { if (u === API_URL) localStorage.removeItem('carnet.url'); else localStorage.setItem('carnet.url', JSON.stringify(u)); } catch (e) {} location.reload(); }
+function changerCarnet(u) {
+  // 1.9 (carnet-code) : des saisies de ce carnet attendent encore le réseau → on prévient (elles partiront au retour sur ce carnet)
+  const n = typeof S !== 'undefined' && S.queue ? S.queue.filter(o => !o.facultatif).length : 0;
+  if (n && !confirm((n > 1 ? n + ' saisies de ce carnet attendent encore le réseau. Elles partiront' : '1 saisie de ce carnet attend encore le réseau. Elle partira') + ' quand tu reviendras sur ce carnet.\n\nChanger de carnet quand même ?')) return;
+  try { if (u === API_URL) localStorage.removeItem('carnet.url'); else localStorage.setItem('carnet.url', JSON.stringify(u)); } catch (e) {} location.reload(); }
 // 1.8.6 : l'adresse du Sheet n'est plus écrite ici (dépôt public) : le script la donne après la clé
 const sheetUrl = () => (S.d && S.d.serveur && /^https:\/\/docs\.google\.com\//.test(S.d.serveur.sheetUrl || '')) ? S.d.serveur.sheetUrl : '';
 const VERSION = (self.CARNET_VERSION || {}).app || '?';   // le numéro se change dans version.js
@@ -473,7 +477,7 @@ const zoneTag = z => { const c = ZC.find(x => String(z).includes(x[0])) || ['', 
 const pieceTag = p => { const c = PC[p] || ['#E5DFD0', '#3A3E45']; return `<span class="tag" style="background:${c[0]};color:${c[1]}">${esc(p || '—')}</span>`; };
 const ETATS = { 'EN RETARD': ['RETARD', 'var(--red)'], 'BIENTÔT': ['BIENTOT', 'var(--yel)'], 'RAS': ['RAS', 'var(--grn)'], 'À PLANIFIER': ['PLANIF', 'var(--grey)'] };
 const stamp = e => e ? `<span class="stamp st-${(ETATS[e] || ['PLANIF'])[0]}">${esc(e)}</span>` : '';
-const gStamp = s => s ? `<span class="stamp st-${s.replace(/[\sÉÔ]/g, m => m === ' ' ? '' : m === 'É' ? 'E' : 'O')}">${esc(s)}</span>` : '';
+const gStamp = s => s ? `<span class="stamp st-${esc(String(s).replace(/[\sÉÔ]/g, m => m === ' ' ? '' : m === 'É' ? 'E' : 'O').replace(/[^A-Za-z0-9-]/g, ''))}">${esc(s)}</span>` : '';   // 1.9 : classe limitée à lettres/chiffres
 
 /* ================= ÉTAT ================= */
 const S = {
@@ -1144,13 +1148,13 @@ function rendreExport() {
   if (enCours) h += `<div class="prog"><div class="lab">Export en cours${st.pieces && st.pieces.length ? ' · ' + esc(st.pieces.join(', ')) : ''}</div><div class="et">${esc(st.etape || '…')}</div>
     <div class="gauge run"><i style="width:${Math.max(4, +st.pct || 0)}%"></i></div><div class="sub">${+st.pct || 0} % · tu peux fermer l'appli, le mail suivra</div>
     <button class="stop ${f.stop ? 'conf' : ''}" data-act="x-stop" ${f.arret ? 'disabled' : ''}>${f.arret ? 'Annulation…' : f.stop ? 'Touche encore pour confirmer' : '✕ Annuler l\'export'}</button></div>`;
-  if (st && st.etat === 'termine') h += `<div class="okbox"><h4>✓ ${st.ludo ? 'Ludothèque prête' : 'Dossier prêt'}</h4><div style="font-size:13.5px">${st.ludo ? esc(st.nbJeux) + ' jeux · ' + e0(st.valeurJeux) + ' · ' + ago(st.fin) + '</div>' : `${esc(st.nbBiens)} biens · ${esc(st.nbAnnexes)}${st.nbAnnexesPrevues ? '/' + st.nbAnnexesPrevues : ''} factures en annexe${st.pagesAnnexes ? ' (' + st.pagesAnnexes + ' p.)' : ''} · ${ago(st.fin)}</div>`}
+  if (st && st.etat === 'termine') h += `<div class="okbox"><h4>✓ ${st.ludo ? 'Ludothèque prête' : 'Dossier prêt'}</h4><div style="font-size:13.5px">${st.ludo ? esc(st.nbJeux) + ' jeux · ' + e0(st.valeurJeux) + ' · ' + ago(st.fin) + '</div>' : `${esc(st.nbBiens)} biens · ${esc(st.nbAnnexes)}${st.nbAnnexesPrevues ? '/' + esc(st.nbAnnexesPrevues) : ''} factures en annexe${st.pagesAnnexes ? ' (' + esc(st.pagesAnnexes) + ' p.)' : ''} · ${ago(st.fin)}</div>`}
     ${(st.avertissements || []).length ? `<ul class="warnlist">${st.avertissements.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}</div>
     <a class="go" href="${hrefSur(st.pdf)}" target="_blank" rel="noopener">Ouvrir le PDF</a>
     <div class="btnrow">${st.docx ? `<a class="go sec2" href="${hrefSur(st.docx)}" target="_blank" rel="noopener">Version Word</a>` : ''}<a class="go sec2" href="${hrefSur(st.dossier)}" target="_blank" rel="noopener">Dossier Drive</a></div>`;
   else if (st && st.etat === 'annule') h += `<div class="note">Export annulé${st.fin ? ' ' + ago(st.fin) : ''}. Tu peux en relancer un.</div>`;
   else if (st && st.etat === 'erreur') h += `<div class="errbox"><b>L'export a échoué</b><br>${esc(st.message || '')}</div>`;
-  if (f.dernier && !(st && st.etat === 'termine')) h += `<div class="lbl">Dernier dossier</div><div class="list"><a class="item tap" href="${hrefSur(f.dernier.pdf)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="grow"><div class="ttl">${esc(f.dernier.ludo ? 'Ludothèque' : (f.dernier.pieces || []).length ? f.dernier.pieces.join(', ') : 'Inventaire complet')}</div><div class="desc">${f.dernier.ludo ? f.dernier.nbJeux + ' jeux · ' + e0(f.dernier.valeurJeux) : f.dernier.nbBiens + ' biens · ' + f.dernier.nbAnnexes + ' factures'} · ${ago(f.dernier.fin)}</div></div><span class="badge">PDF ›</span></a></div>`;
+  if (f.dernier && !(st && st.etat === 'termine')) h += `<div class="lbl">Dernier dossier</div><div class="list"><a class="item tap" href="${hrefSur(f.dernier.pdf)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="grow"><div class="ttl">${esc(f.dernier.ludo ? 'Ludothèque' : (f.dernier.pieces || []).length ? f.dernier.pieces.join(', ') : 'Inventaire complet')}</div><div class="desc">${f.dernier.ludo ? esc(f.dernier.nbJeux) + ' jeux · ' + e0(f.dernier.valeurJeux) : esc(f.dernier.nbBiens) + ' biens · ' + esc(f.dernier.nbAnnexes) + ' factures'} · ${ago(f.dernier.fin)}</div></div><span class="badge">PDF ›</span></a></div>`;
   $('#sheetIn').innerHTML = h;
 }
 // 1.8.4 : l'appli lance elle-même la passe d'export suivante (sans attendre le déclencheur Google, 1 à 2 min) ; on n'attend pas la réponse
