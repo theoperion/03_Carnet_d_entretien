@@ -1668,19 +1668,40 @@ function ouvrirTrophee(id) {
     ${t.theme && t.ok ? `<button class="go" data-act="theme" data-t="${t.theme.id}">${j.theme === t.theme.id ? '✓ Thème en cours' : 'Appliquer le thème ' + esc(t.theme.nom)}</button>` : ''}
     <button class="go sec2" data-act="trophees">‹ Tous les trophées</button>`);
 }
-function ouvrirAide() {
-  S.form = { mode: 'aide' };
-  ouvrir(tete('❓ Comment ça marche') + `
-    <div class="kv">
-      <div>🎬 À l'affiche</div><div>En haut de l'accueil : la chose la plus urgente à faire, avec la scène de sa zone (cuisine, salle de bain, VMC, balcon, aquarium, salle ciné…). En retard, le décor se dégrade (fumée, calcaire, poussière, feuilles mortes) ; ‹ › pour voir les suivantes. Quand tout est à jour : relâche, la salle ciné est à toi.</div>
-      <div>🐟 Aquarium</div><div>Un poisson par trophée gagné. L'eau se trouble quand des tâches sont en retard. Le filtre fait des bulles, sauf si l'entretien de l'aquarium est en retard.</div>
-      <div>🔥 Série</div><div>Nombre de semaines d'affilée (du lundi au dimanche) sans aucune tâche en retard. Une tâche est en retard dès le lendemain de sa date prévue.</div>
-      <div>🎞 Pellicule</div><div>Un photogramme par mois : ★ si le mois entier s'est passé sans retard, sinon la part des jours sans retard.</div>
-      <div>🏆 Trophées</div><div>Calculés à partir de ton historique et de l'inventaire. Une fois gagné, un trophée reste gagné. Touche un trophée pour voir comment l'obtenir et pourquoi tu l'as.</div>
-      <div>🎨 Thèmes</div><div>Chaque thème est la récompense d'un trophée (indiqué sur sa carte). Le thème choisi suit sur tous tes appareils.</div>
-      <div>🏖 Vacances</div><div>Les semaines d'absence ne comptent pas : la série est en pause, et le mail de rappel d'entretien ne part pas.</div>
-    </div>
-    <button class="go sec2" data-act="trophees">‹ Trophées</button>`);
+function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulement le jeu)
+  S.form = { mode: 'aide', depuis: depuis || 'trophees' };
+  const d = S.d || {}, inv = !!((d.inventaire || []).length || ((d.listes || {}).pieces || []).length);
+  const bloc = (titre, lignes) => `<div class="lbl">${titre}</div><div class="kv">${lignes.map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join('')}</div>`;
+  let h = bloc('L\'entretien', [
+    ['🔧 Les tâches', 'Chaque tâche a une fréquence (tous les 3 mois, tous les ans…). Le carnet calcule la prochaine date à partir du dernier passage.'],
+    ['✓ C\'est fait', 'Touche une tâche, puis « ✓ C\'est fait » : choisis le jour (aujourd\'hui, hier…) et, si tu veux, la durée. La prochaine date se recalcule aussitôt.'],
+    ['🚦 Les états', '<b>En retard</b> dès le lendemain de la date prévue · <b>Sous 30 jours</b> : à caler dans l\'agenda · <b>RAS</b> : rien à signaler · <b>Jamais faites</b> : à planifier une 1re fois.'],
+    ['✉️ Le mail', 'Le matin où une tâche arrive à échéance, un mail part, <b>une seule fois</b> : jamais de relance. La tâche reste en retard dans l\'appli jusqu\'à « C\'est fait ».'],
+    ['📒 Historique', 'Tous les passages notés. Touche un passage pour corriger sa date ou sa durée, ou le supprimer (il faut toucher deux fois).'],
+    ['🧴 Consommables', 'Dans l\'onglet Entretien : les produits d\'entretien et ce qu\'il reste à racheter.']
+  ]);
+  if (inv) h += bloc('L\'inventaire', [
+    ['🛋️ Les biens', 'Chaque objet de l\'appartement avec sa pièce, son prix, sa facture et ses photos. Cherche par objet, marque ou magasin.'],
+    ['🛡 Garanties', 'Une alerte apparaît quand une garantie finit dans moins de 30 jours, et un mail part une seule fois : teste l\'appareil à fond avant la fin.'],
+    ['📊 Plafond MAIF', 'La jauge compare la valeur du mobilier (hors travaux) au plafond assuré. À 95 %, un mail te prévient d\'en demander le relèvement.'],
+    ['📄 Dossier assurance', 'Coche les biens importants (« Ajouter au dossier MAIF »), puis « Dossier pour l\'assurance » : un PDF et un Word avec fiches, photos et factures. Il se fabrique en arrière-plan, un mail arrive avec les liens.']
+  ]);
+  h += bloc('Les contacts', [['📇 Contacts', 'Sur l\'accueil : plombier, SAV, syndic… Les boutons appellent ou écrivent directement. Toucher un contact permet de le modifier ; le supprimer demande deux appuis.']]);
+  h += bloc('Sans réseau', [
+    ['📶 Hors connexion', 'Tout se note même sans réseau (cave, salle de bain). Le point en haut indique l\'envoi en cours ; les saisies partent seules au retour du réseau, sans doublon ni perte.'],
+    ['⚙️ Réglages', 'L\'état du mail, le nombre de saisies en attente, la version de l\'appli, et le bouton pour actualiser.']
+  ]);
+  h += bloc('Le jeu', [
+    ['🎬 À l\'affiche', 'En haut de l\'accueil : la chose la plus urgente à faire, avec la scène de sa zone. En retard, le décor se dégrade ; ‹ › pour voir les suivantes. Quand tout est à jour : relâche, la salle ciné est à toi.'],
+    ['🐟 Aquarium', 'Un poisson par trophée gagné. L\'eau se trouble quand des tâches sont en retard. Le filtre fait des bulles, sauf si l\'entretien de l\'aquarium est en retard.'],
+    ['🔥 Série', 'Nombre de semaines d\'affilée (du lundi au dimanche) sans aucune tâche en retard.'],
+    ['🎞 Pellicule', 'Un photogramme par mois : ★ si le mois entier s\'est passé sans retard, sinon la part des jours sans retard.'],
+    ['🏆 Trophées', 'Calculés à partir de ton historique' + (inv ? ' et de l\'inventaire' : '') + '. Une fois gagné, un trophée reste gagné. Touche un trophée pour voir comment l\'obtenir.'],
+    ['🎨 Thèmes', 'Chaque thème est la récompense d\'un trophée. Le thème choisi suit sur tous tes appareils.'],
+    ['🏖 Vacances', 'Les semaines d\'absence ne comptent pas : la série est en pause, et le mail de rappel d\'entretien ne part pas.']
+  ]);
+  ouvrir(tete('❓ Comment ça marche') + h + (S.form.depuis === 'reglages'
+    ? '<button class="go sec2" data-act="gear">‹ Réglages</button>' : '<button class="go sec2" data-act="trophees">‹ Trophées</button>'));
 }
 
 /* ---------- réglages ---------- */
@@ -1696,6 +1717,7 @@ function ouvrirReglages() {
       <div>Version</div><div class="mono">app ${VERSION} · api ${esc(sv.version || '?')}</div>
     </div>
     <button class="go" data-act="trophees">🏆 Trophées, thèmes et vacances</button>
+    <button class="go sec2" data-act="aide-r">❓ Comment ça marche</button>
     <button class="go sec2" data-act="mailtest">Envoyer un mail de test</button>
     <div class="btnrow"><button class="go sec2" data-act="refresh">↻ Actualiser</button>${sheetUrl() ? `<a class="go sec2" href="${esc(sheetUrl())}" target="_blank" rel="noopener">Ouvrir le Sheet</a>` : ''}</div>
     <button class="go danger" data-act="logout">Changer de clé d'accès</button>`);
@@ -1792,6 +1814,7 @@ document.addEventListener('click', ev => {
     case 'trophees': ouvrirTrophees(); break;
     case 'trophee': ouvrirTrophee(el.dataset.id); break;
     case 'aide': ouvrirAide(); break;
+    case 'aide-r': ouvrirAide('reglages'); break;
     case 'aff-prev': affNav(-1); break;
     case 'aff-next': affNav(1); break;
     case 'aff-photos': fermer(); S.tab = 'inventaire'; S.iPiece = el.dataset.p || null; S.iFiltre = 'photo'; rendre(); scrollTo(0, 0); break;
