@@ -362,7 +362,7 @@ html[data-theme="nuit"] .tag,html[data-theme="cine"] .tag{filter:saturate(.85) b
   <button class="tab" data-act="tab:entretien"><svg class="i" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.2 5.2l-5.8 5.8a1.8 1.8 0 0 0 2.5 2.5l5.8-5.8a4 4 0 0 0 5.2-5.2l-2.5 2.5-2.3-.6-.6-2.3z"/></svg>ENTRETIEN</button>
   <button class="plus" data-act="plus" aria-label="Noter un passage"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
   <button class="tab" data-act="tab:histo"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M9 10h6M9 14h6M9 18h3"/></svg>HISTORIQUE</button>
-  <button class="tab" data-act="tab:inventaire"><svg class="i" viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg>INVENTAIRE</button>
+  <button class="tab" id="tab4" data-act="tab:inventaire"><svg class="i" viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg>INVENTAIRE</button>
 </nav>
 
 <div class="veil" id="veil" data-act="close"></div>
@@ -667,19 +667,33 @@ function apresAppel(op, res) {
 function rendre(silencieux) {
   if (!S.d) { $('#main').innerHTML = '<div class="empty">Chargement du carnet…</div>'; return; }
   rafraichirEtats();
-  const tInv = document.querySelector('.tab[data-act="tab:inventaire"]'); if (tInv) tInv.hidden = !mod('inventaire');
-  if (S.tab === 'inventaire' && !mod('inventaire')) S.tab = 'bord';
+  // 1.9.6 : 4e onglet = Inventaire, ou Contacts pour un carnet sans inventaire (Carla) ; caché s'il n'y a ni l'un ni l'autre
+  const t4 = $('#tab4'), q4 = mod('inventaire') ? 'inventaire' : mod('contacts') ? 'contacts' : '';
+  if (t4) {
+    t4.hidden = !q4;
+    if (q4 && t4.dataset.act !== 'tab:' + q4) { t4.dataset.act = 'tab:' + q4; t4.innerHTML = q4 === 'inventaire'
+      ? '<svg class="i" viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg>INVENTAIRE'
+      : '<svg class="i" viewBox="0 0 24 24"><path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6z"/><circle cx="11.5" cy="10" r="2.6"/><path d="M7.5 17c.8-2.4 2.3-3.4 4-3.4s3.2 1 4 3.4M4 7h2M4 12h2M4 17h2"/></svg>CONTACTS'; }
+  }
+  if ((S.tab === 'inventaire' || S.tab === 'contacts') && S.tab !== q4) S.tab = 'bord';
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.act === 'tab:' + S.tab));
-  const T = { bord: [nomCarnet(), 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], inventaire: ['Inventaire', (EST_T3 ? 'Assurance MAIF · biens' : 'Biens') + ', factures, photos'] }[S.tab];
+  const T = { bord: [nomCarnet(), 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], contacts: ['Contacts', 'Artisans, syndic, SAV…'], inventaire: ['Inventaire', (EST_T3 ? 'Assurance MAIF · biens' : 'Biens') + ', factures, photos'] }[S.tab];
   $('#htitle').textContent = T[0]; $('#hsub').textContent = (DEFAUT || (FIGE && !FIGE.id) || S.tab === 'bord' ? '' : '📒 ' + nomCarnet() + ' · ') + T[1];   // 1.9 : on voit toujours dans quel carnet on est
   const y = scrollY;
-  $('#main').innerHTML = `<div class="view">${({ bord: vBord, entretien: vEntretien, histo: vHisto, inventaire: vInventaire })[S.tab]()}</div>`;
+  $('#main').innerHTML = `<div class="view">${({ bord: vBord, entretien: vEntretien, histo: vHisto, inventaire: vInventaire, contacts: vContacts })[S.tab]()}</div>`;
   if (silencieux) scrollTo(0, y);
   if (!silencieux) LS.set('tab', S.tab);
   clearTimeout(S.trT); S.trT = setTimeout(verifierTrophees, 600);
 }
 
 /* ---------- BORD ---------- */
+/* 1.9.6 : liste des contacts (tableau de bord du T3, ou onglet Contacts d'un carnet sans inventaire) */
+function listeContacts() {
+  return `<div class="sec"><h2>Contacts</h2><button class="lnk" data-act="contact-new">+ Ajouter</button></div><div class="list">` +
+    (S.d.contacts.length ? S.d.contacts.map(c => `<div class="item"><div class="grow tap" data-act="contact" data-id="${esc(c.id)}"><div class="ttl">${esc(c.nom || c.pourquoi)}</div><div class="desc">${esc(c.pourquoi)}${c.notes ? ' · ' + esc(c.notes) : ''}</div></div>
+      ${c.tel ? `<a class="mini" href="tel:${esc(c.tel.replace(/\s/g, ''))}">${ICON.phone}</a>` : ''}${c.mail ? `<a class="mini" href="mailto:${esc(c.mail)}">${ICON.mail}</a>` : ''}</div>`).join('') : '<div class="empty">Aucun contact</div>') + '</div>';
+}
+function vContacts() { return listeContacts() + (mod('consommables') ? '<button class="expbtn" data-act="conso" style="margin-top:14px"><span class="ic">🧴</span><span><b>Consommables</b><small>Les produits d\'entretien et ce qu\'il reste à racheter</small></span><span class="chev">›</span></button>' : ''); }
 function vBord() {
   const E = S.d.entretien, n = e => E.filter(t => t.etat === e).length;
   const ret = n('EN RETARD'), bt = n('BIENTÔT'), ras = n('RAS'), pl = n('À PLANIFIER');
@@ -716,10 +730,8 @@ function vBord() {
     const tz = E.filter(t => t.zone === z), ok = tz.filter(t => t.etat !== 'EN RETARD').length, p = Math.round(100 * ok / tz.length), on = Math.round(p / 10);
     return `<button class="zline" style="width:100%;text-align:left" data-act="zone" data-z="${esc(z)}"><span class="zn">${esc(z)}</span><span class="gg ${p < 100 ? 'bad' : ''}">${'▰'.repeat(on)}${'▱'.repeat(10 - on)}</span><span class="pc">${p}%</span></button>`;
   }).join('') + '</div>';
-  // contacts
-  if (mod('contacts')) h += `<div class="sec"><h2>Contacts</h2><button class="lnk" data-act="contact-new">+ Ajouter</button></div><div class="list">` +
-    (S.d.contacts.length ? S.d.contacts.map(c => `<div class="item"><div class="grow tap" data-act="contact" data-id="${esc(c.id)}"><div class="ttl">${esc(c.nom || c.pourquoi)}</div><div class="desc">${esc(c.pourquoi)}${c.notes ? ' · ' + esc(c.notes) : ''}</div></div>
-      ${c.tel ? `<a class="mini" href="tel:${esc(c.tel.replace(/\s/g, ''))}">${ICON.phone}</a>` : ''}${c.mail ? `<a class="mini" href="mailto:${esc(c.mail)}">${ICON.mail}</a>` : ''}</div>`).join('') : '<div class="empty">Aucun contact</div>') + '</div>';
+  // contacts : sur le tableau de bord seulement s'ils n'ont pas leur propre onglet
+  if (mod('contacts') && mod('inventaire')) h += listeContacts();
   if (ESSAI) h += `<div class="foot">Carnet d'essai · tout reste sur ce téléphone</div>`; else h += `<div class="foot">Fichier synchronisé · ${S.d.maj ? new Date(S.d.maj).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : ''}</div>`;
   return h;
 }
@@ -1874,7 +1886,7 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
     (EST_T3 || (S.d && S.d.plafond)) && ['📊 Plafond ' + AS_DE, 'La jauge compare la valeur du mobilier (hors travaux) au plafond assuré. À 95 %, un mail te prévient d\'en demander le relèvement.'],
     EST_T3 && ['📄 Dossier assurance', 'Coche les biens importants (« Ajouter au dossier MAIF »), puis « Dossier pour l\'assurance » : un PDF et un Word avec fiches, photos et factures. Il se fabrique en arrière-plan, un mail arrive avec les liens.']
   ]);
-  if (mod('contacts')) h += bloc('Les contacts', [['📇 Contacts', 'Sur l\'accueil : plombier, SAV, syndic… Les boutons appellent ou écrivent directement. Toucher un contact permet de le modifier ; le supprimer demande deux appuis.']]);
+  if (mod('contacts')) h += bloc('Les contacts', [['📇 Contacts', (mod('inventaire') ? 'Sur l\'accueil' : 'Dans l\'onglet Contacts') + ' : plombier, SAV, syndic… Les boutons appellent ou écrivent directement. Toucher un contact permet de le modifier ; le supprimer demande deux appuis.']]);
   h += bloc('Sans réseau', [
     ['📶 Hors connexion', 'Tout se note même sans réseau (cave, salle de bain). Le point en haut indique l\'envoi en cours ; les saisies partent seules au retour du réseau, sans doublon ni perte.'],
     ['⚙️ Réglages', 'L\'état du mail, le nombre de saisies en attente, la version de l\'appli, et le bouton pour actualiser.']
