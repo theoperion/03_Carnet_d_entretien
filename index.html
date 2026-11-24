@@ -167,7 +167,7 @@ main{padding:14px 14px 0}
 
 /* ---------- barre du bas ---------- */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--enc);padding:6px 6px calc(8px + var(--safeB));display:flex;justify-content:space-around;align-items:flex-end;max-width:520px;margin:0 auto;border-top:4px solid var(--yel)}
-nav.tabs .tab[hidden]{display:none}
+nav.tabs .tab[hidden]{display:flex;visibility:hidden;pointer-events:none}   /* 1.9.1 : garde sa place, le ✓ reste au milieu */
 .tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--light);font-family:var(--t);font-size:10px;letter-spacing:.4px;padding:4px 0}
 .tab.on{color:var(--yel)}
 .plus{flex:none;width:58px;height:58px;border-radius:50%;background:var(--yel);color:var(--enc);display:grid;place-items:center;margin:-26px 6px 2px;box-shadow:0 0 0 5px var(--enc),0 4px 10px rgba(0,0,0,.35)}
@@ -387,7 +387,7 @@ const lireLien = s => { s = String(s || '').trim(); const m = /[#&]s=([A-Za-z0-9
 /* 1.9 (carnet-code) : un lien inconnu ne fait plus changer de carnet sans demander, dès qu'une clé existe sur le téléphone
    (un faux carnet ne doit jamais pouvoir s'ouvrir à la place du vrai sans que la personne le voie). */
 const nsDe = id => id === idDe(API_URL) ? '' : 'c' + Array.from(id).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36) + '.';
-const clesSurTel = () => { try { return Object.keys(localStorage).filter(k => /^carnet\.(c[0-9a-z]+\.)?key$/.test(k) && JSON.parse(localStorage.getItem(k) || '""')); } catch (e) { return []; } };
+const clesSurTel = () => { try { return Object.keys(localStorage).filter(k => /^carnet\.(c[0-9a-z]+\.)?key$/.test(k) && JSON.parse(localStorage.getItem(k) || '""') && JSON.parse(localStorage.getItem(k)) !== 'essai'); } catch (e) { return []; } };
 const connus = () => { try { const c = JSON.parse(localStorage.getItem('carnet.connus') || '{}'); return c && typeof c === 'object' ? c : {}; } catch (e) { return {}; } };
 const ID_ESSAI = 'carnet_essai_exemple_2026';   // 1.9.1 : carnet d'essai, entièrement dans le téléphone (aucun script, aucun envoi)
 let CARNET_PROPOSE = '';   // id d'un carnet reçu par lien, en attente de « Ouvrir ce carnet ? »
@@ -424,7 +424,7 @@ const VERSION = (self.CARNET_VERSION || {}).app || '?';   // le numéro se chang
 /* ================= OUTILS ================= */
 const $ = s => document.querySelector(s);
 const LS = {
-  n(k) { return 'carnet.' + (COMMUN[k] ? '' : NS) + k; },
+  n(k) { return 'carnet.' + (COMMUN[k] && !(ESSAI && k === 'theme') ? '' : NS) + k; },   // 1.9.1 : le thème choisi dans l'essai ne touche pas au vrai carnet
   get(k, d) { try { const v = localStorage.getItem(LS.n(k)); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(LS.n(k), JSON.stringify(v)); } catch (e) {} },
   del(k) { try { localStorage.removeItem(LS.n(k)); } catch (e) {} }
@@ -700,7 +700,7 @@ function vBord() {
   if (mod('contacts')) h += `<div class="sec"><h2>Contacts</h2><button class="lnk" data-act="contact-new">+ Ajouter</button></div><div class="list">` +
     (S.d.contacts.length ? S.d.contacts.map(c => `<div class="item"><div class="grow tap" data-act="contact" data-id="${esc(c.id)}"><div class="ttl">${esc(c.nom || c.pourquoi)}</div><div class="desc">${esc(c.pourquoi)}${c.notes ? ' · ' + esc(c.notes) : ''}</div></div>
       ${c.tel ? `<a class="mini" href="tel:${esc(c.tel.replace(/\s/g, ''))}">${ICON.phone}</a>` : ''}${c.mail ? `<a class="mini" href="mailto:${esc(c.mail)}">${ICON.mail}</a>` : ''}</div>`).join('') : '<div class="empty">Aucun contact</div>') + '</div>';
-  h += `<div class="foot">Fichier synchronisé · ${S.d.maj ? new Date(S.d.maj).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : ''}</div>`;
+  if (ESSAI) h += `<div class="foot">Carnet d'essai · tout reste sur ce téléphone</div>`; else h += `<div class="foot">Fichier synchronisé · ${S.d.maj ? new Date(S.d.maj).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : ''}</div>`;
   return h;
 }
 function ligneTache(t, compact) {
@@ -1119,6 +1119,7 @@ function basculerMaif() {
 
 /* ---------- export du dossier (PDF / Word) ---------- */
 function ouvrirExport(ludo) {
+  if (ESSAI) { toast('📄 Le dossier PDF pour l\'assurance se fabrique dans un vrai carnet (pas dans l\'essai)'); return; }
   S.form = { mode: 'export', pieces: new Set(S.iPiece ? [S.iPiece] : []), annexes: true, maif: S.d.inventaire.some(b => b.maif), ludo: !!ludo && (S.d.jeux || []).length > 0, st: S.expSt || null, dernier: S.expDernier || null, charge: !S.expSt };
   ouvrir(''); rendreExport(); suivreExport();
 }
@@ -1758,7 +1759,7 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
     ['⚙️ Réglages', 'L\'état du mail, le nombre de saisies en attente, la version de l\'appli, et le bouton pour actualiser.']
   ]);
   h += bloc('Partage et autres carnets', [
-    ['📤 Partager', 'Réglages › « Partager le lien de ce carnet » : envoie le lien par message, et la clé d\'accès dans un autre message. Le lien ouvre le carnet sur l\'autre téléphone, la clé le déverrouille.'],
+    ['📤 Partager', 'Réglages › « Partager le lien de ce carnet » : envoie le lien par message, et la clé d\'accès dans un autre message (le carnet d\'essai, lui, n\'a pas de clé). Le lien ouvre le carnet sur l\'autre téléphone, la clé le déverrouille.'],
     ['🔗 Lien reçu', 'Ouvre le lien reçu, puis tape la clé de ce carnet (si un autre carnet est déjà sur le téléphone, l\'appli demande d\'abord « Ouvrir ce carnet ? »). Sur iPhone, si l\'appli installée ne le reconnaît pas, touche « J\'ai reçu un lien de carnet » et colle le lien.'],
     ['🧪 Carnet d\'essai', 'Réglages › « Essayer avec un carnet d\'exemple » : un carnet aux données inventées, sans clé, où rien n\'est envoyé. Idéal pour découvrir l\'appli ou la montrer ; « Quitter l\'essai » ramène à ton carnet.'],
     ['📒 Plusieurs carnets', 'Chaque carnet garde ses propres données et ses saisies en attente : rien ne passe d\'un carnet à l\'autre. Les carnets déjà ouverts sur le téléphone sont dans Réglages, pour passer de l\'un à l\'autre.']
@@ -1794,7 +1795,7 @@ function ouvrirReglages() {
     <div class="btnrow"><button class="go sec2" data-act="refresh">↻ Actualiser</button>${sheetUrl() ? `<a class="go sec2" href="${esc(sheetUrl())}" target="_blank" rel="noopener">Ouvrir le Sheet</a>` : ''}</div>
     <div class="lbl">Partage et autres carnets</div>
     <div class="list">
-      <div class="item tap" data-act="partager"><span>📤</span><div class="grow"><div class="ttl">Partager le lien de ce carnet</div><div class="desc">Pour l'ouvrir sur un autre téléphone. Envoie la clé dans un autre message.</div></div></div>
+      <div class="item tap" data-act="partager"><span>📤</span><div class="grow"><div class="ttl">Partager le lien de ce carnet</div><div class="desc">${ESSAI ? 'Pour montrer l\'appli : le lien suffit, l\'essai n\'a pas de clé.' : 'Pour l\'ouvrir sur un autre téléphone. Envoie la clé dans un autre message.'}</div></div></div>
       ${autresCarnets().map(c => `<div class="item tap" data-act="aller-carnet" data-id="${esc(c.id)}"><span>📒</span><div class="grow"><div class="ttl">Aller au carnet « ${esc(c.nom)} »</div><div class="desc">Déjà ouvert sur ce téléphone</div></div></div>`).join('')}
       ${ESSAI ? '' : '<div class="item tap" data-act="essai"><span>🧪</span><div class="grow"><div class="ttl">Essayer avec un carnet d\'exemple</div><div class="desc">Données inventées, rien n\'est envoyé. Pratique pour montrer l\'appli.</div></div></div>'}
       <div class="item tap" data-act="autre-carnet"><span>🔗</span><div class="grow"><div class="ttl">J'ai reçu un lien de carnet</div><div class="desc">Ouvrir le carnet de quelqu'un d'autre (avec sa clé)</div></div></div>
@@ -1848,6 +1849,7 @@ function apiEssai(action, x) {
 function quitterEssai() {   // retour au carnet principal, ou au dernier autre carnet ouvert s'il n'y a pas de clé T3 sur le téléphone
   const c = connus(); delete c[ID_ESSAI]; LS.set('connus', c); ['cache', 'queue', 'key', 'essaiRow'].forEach(k => LS.del(k));
   const autre = Object.keys(c).find(id => id !== idDe(API_URL) && ID_OK.test(id));
+  try { sessionStorage.setItem('carnet.apresEssai', '1'); } catch (e) {}
   changerCarnet(!clesSurTel().includes('carnet.key') && autre ? urlDe(autre) : API_URL);
 }
 /* 1.9.1 : un autre carnet ne peut pas se faire appeler comme le carnet principal (sinon on pourrait y taper la clé du T3) */
@@ -1883,7 +1885,7 @@ function proposerCarnet() {   // 1.9 (carnet-code) : « Ouvrir ce carnet ? » à
 }
 function partagerLien() {   // 1.9 : partage du lien d'installation (SMS, WhatsApp, mail…) ; copie si le partage n'existe pas
   const url = lienCarnet(), titre = 'Mon carnet d\'entretien';
-  if (navigator.share) { navigator.share({ title: titre, text: 'Ouvre ce lien sur ton téléphone pour installer le carnet (je t\'envoie la clé à part) :', url }).catch(() => {}); return; }
+  if (navigator.share) { navigator.share({ title: titre, text: ESSAI ? 'Essaie ce carnet d\'entretien (données inventées, pas de clé) :' : 'Ouvre ce lien sur ton téléphone pour installer le carnet (je t\'envoie la clé à part) :', url }).catch(() => {}); return; }
   const fini = () => toast('🔗 Lien copié : colle-le dans un message');
   if (navigator.clipboard) navigator.clipboard.writeText(url).then(fini, () => prompt('Copie ce lien :', url)); else prompt('Copie ce lien :', url);
 }
@@ -1895,6 +1897,7 @@ function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai 
   const l = $('#lock'); l.hidden = false;
   const peutAnnuler = annulable && S.key && S.d;
   const retourT3 = !DEFAUT && clesSurTel().includes('carnet.key');   // seulement si le carnet T3 a déjà été ouvert ici
+  let apresEssai = false; try { apresEssai = !!sessionStorage.getItem('carnet.apresEssai'); sessionStorage.removeItem('carnet.apresEssai'); } catch (e) {}
   const aide = 'Pas ton carnet ? Touche « J\'ai reçu un lien de carnet » et colle le lien reçu par message.';
   const nomConnu = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);
   const titre = lienSeul ? 'J\'ai reçu un lien de carnet' : DEFAUT ? 'Carnet d\'entretien' : nomConnu ? esc(String(nomConnu).slice(0, 30)) : 'Carnet ouvert par lien';
@@ -1903,7 +1906,7 @@ function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai 
     <p class="muted" style="margin:0 0 18px;font-style:italic">${sous}</p>
     <input class="field" id="kin" type="password" placeholder="Clé d'accès" autocomplete="current-password">
     <div class="err" id="kerr">${msg ? esc(msg) : ''}</div>
-    <p class="muted" id="kaide" style="font-size:13px;margin:4px 0 0" ${msg && DEFAUT ? '' : 'hidden'}>${aide}</p>
+    <p class="muted" id="kaide" style="font-size:13px;margin:4px 0 0" ${(msg || apresEssai) && DEFAUT ? '' : 'hidden'}>${apresEssai ? 'Fin de l\'essai. Pour ouvrir un vrai carnet, touche « J\'ai reçu un lien de carnet » et colle le lien reçu par message.' : aide}</p>
     <button class="go" id="kgo">Ouvrir le carnet</button>
     <button class="go sec2" id="klien" style="margin-top:14px">🔗 J'ai reçu un lien de carnet</button>
     <div id="kzone" hidden><input class="field" id="kurl" placeholder="Colle ici le lien reçu" autocomplete="off"><button class="go sec2" id="kok">Ouvrir ce lien</button></div>
@@ -2068,6 +2071,7 @@ charger = function (d) {
 } catch (e) {} })();
 idsLocaux();
 appliquerTheme(LS.get('theme', 'chantier'));
+if (S.key && !ESSAI) try { sessionStorage.removeItem('carnet.apresEssai'); } catch (e) {}
 if (ESSAI && !S.key) { S.key = 'essai'; LS.set('key', 'essai'); }
 if (!S.key || !apiUrl()) verrouiller(); else { rendre(); rafraichir(true); pomper(); }
 if (CARNET_PROPOSE) proposerCarnet();   // 1.9 : lien d'un carnet inconnu → on demande avant d'ouvrir
