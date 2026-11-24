@@ -1863,7 +1863,7 @@ function nomSur(n, id) {
   n = String(n || '').replace(/\s+/g, ' ').trim().slice(0, 30); if (!n) return '';
   if ((id || idDe(URL_CARNET)) === idDe(API_URL)) return n;
   const c = x => norm(String(x).normalize('NFKD').replace(/[ТтΤτƬƫŦŧȚțʈ]/g, 't').replace(/[ЗзƷʒ]/g, '3')).replace(/[^a-z0-9]/g, '');   // aussi les lettres qui imitent « T3 »
-  return /(^|carnet|appart\w*|logement)t3$/.test(c(n)) || c(n).includes('carnett3') ? '' : n;
+  return /(^|carnet|appart\w*|logement)t3$/.test(c(n)) || c(n).includes('carnett3') || c(n) === c(NOM_DEFAUT) ? '' : n;   // ni « T3 », ni le nom du carnet par défaut (copie figée : « Carnet · T4 »)
 }
 function nomCarnet() {   // 1.9 : le script peut donner un nom (serveur.nom) ; sinon « Carnet · T3 » pour le carnet principal
   const n = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);

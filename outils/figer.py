@@ -18,7 +18,8 @@ FIGES = {
 FICHIERS = ["index.html", "sw.js", "version.js", "manifest.json", "icon-192.png", "icon-512.png", "icon-maskable-512.png"]
 
 def lire(f): return open(os.path.join(RACINE, f), encoding="utf-8").read()
-def empreinte(d): return hashlib.sha256(b"".join(open(os.path.join(d, f), "rb").read() for f in sorted(os.listdir(d)) if f != "EMPREINTE")).hexdigest()
+def empreinte(d):   # noms ET contenus des fichiers : un fichier renommé, ajouté ou retiré change aussi l'empreinte
+    return hashlib.sha256(b"".join(f.encode() + b"\0" + open(os.path.join(d, f), "rb").read() for f in sorted(os.listdir(d)) if f != "EMPREINTE")).hexdigest()
 
 def fabriquer(nom, c):
     dest = os.path.join(RACINE, "fige", nom)
@@ -43,13 +44,16 @@ def fabriquer(nom, c):
     m.update({"name": f"Carnet d'entretien · {c['court']}", "short_name": f"Carnet {c['court']}", "description": "Entretien et historique du logement"})
     json.dump(m, open(os.path.join(dest, "manifest.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     open(os.path.join(dest, "EMPREINTE"), "w").write(empreinte(dest) + "\n")
-    print(f"→ fige/{nom}/ fabriquée (appli {re.search(r'app: \"([^\"]+)\"', lire('version.js')).group(1)}){' · DÉFINITIVE' if c['definitif'] else ''}")
+    version = re.search(r'app: "([^"]+)"', lire("version.js")).group(1)   # hors de la f-string : marche aussi avec Python < 3.12
+    print(f"→ fige/{nom}/ fabriquée (appli {version})" + (" · DÉFINITIVE" if c["definitif"] else ""))
 
 if sys.argv[1:] == ["--verifier"]:
     ko = 0
     for nom, c in FIGES.items():
         d = os.path.join(RACINE, "fige", nom)
-        if not os.path.exists(d): continue
+        if not os.path.exists(d):
+            if c["definitif"]: print(f"✗ fige/{nom} est définitive mais a disparu"); ko = 1
+            continue
         if open(os.path.join(d, "EMPREINTE")).read().strip() != empreinte(d): print(f"✗ fige/{nom} a été modifiée à la main"); ko = 1
     sys.exit(ko)
 if len(sys.argv) != 2 or sys.argv[1] not in FIGES: sys.exit(__doc__)
