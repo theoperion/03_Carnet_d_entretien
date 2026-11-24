@@ -2,7 +2,7 @@
 """Fabrique une COPIE FIGÉE de l'appli pour un carnet remis à quelqu'un (règle de Théo : après la remise, plus aucune
 mise à jour). La copie vit dans fige/<dossier>/ et ne sera plus jamais modifiée une fois « definitif » à True.
 
-    python3 outils/figer.py t4        → (re)fabrique fige/t4/ à partir de l'appli actuelle
+    python3 outils/figer.py <nom>     → (re)fabrique une copie fige/<nom>/ (aucune pour l'instant)
     python3 outils/figer.py commun ../mon_carnet → (re)fabrique la version commune dans le dépôt privé Mon_Carnet
                                        (servi par Cloudflare Pages, comme Mon_Budget) : pas de carnet par défaut,
                                        chacun colle le lien de SON carnet puis sa clé.
@@ -17,8 +17,7 @@ RACINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 FIGES = {
     # Version commune (dépôt privé Mon_Carnet, Cloudflare Pages) pour toutes les personnes à qui Théo transfère un Sheet.
     "commun": {"id": None, "nom": "Mon carnet", "court": "", "definitif": False, "externe": True},
-    # T4 : remis à sa propriétaire au transfert. Passer definitif à True LE JOUR DU TRANSFERT (plus aucune modification ensuite).
-    "t4": {"id": "AKfycbysEJTeMDjtS2WHicGgse_l9PJ0h6NL7mYTExIOTW1_aHGp31UzkBzhhTmnsFg1NXsy", "nom": "Carnet · T4", "court": "T4", "definitif": False},
+    # (24/11) l'ancienne copie fige/t4/ est remplacée par la version commune ci-dessus (https://mon-carnet-cs7.pages.dev/).
 }
 FICHIERS = ["index.html", "sw.js", "version.js", "manifest.json", "icon-192.png", "icon-512.png", "icon-maskable-512.png"]
 
@@ -55,7 +54,7 @@ def fabriquer(nom, c, sortie=None):
         open(os.path.join(dest, "README.md"), "w", encoding="utf-8").write(f"""# Mon carnet d'entretien (version commune)
 
 Appli de carnet d'entretien (PWA) pour toute personne qui a son propre fichier Google « carnet d'entretien » et son script.
-Servie par Cloudflare Pages depuis ce dépôt privé.
+Servie par Cloudflare Pages depuis ce dépôt privé : https://mon-carnet-cs7.pages.dev/
 
 - Au premier lancement, l'appli demande le **lien de ton carnet** (reçu par message), puis ta **clé**. Ils restent sur ton téléphone.
 - **Tes données sont dans ton fichier Google**, jamais ici : ce dépôt ne contient que le programme.
