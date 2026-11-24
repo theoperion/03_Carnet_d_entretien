@@ -167,6 +167,7 @@ main{padding:14px 14px 0}
 
 /* ---------- barre du bas ---------- */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--enc);padding:6px 6px calc(8px + var(--safeB));display:flex;justify-content:space-around;align-items:flex-end;max-width:520px;margin:0 auto;border-top:4px solid var(--yel)}
+nav.tabs .tab[hidden]{display:none}
 .tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--light);font-family:var(--t);font-size:10px;letter-spacing:.4px;padding:4px 0}
 .tab.on{color:var(--yel)}
 .plus{flex:none;width:58px;height:58px;border-radius:50%;background:var(--yel);color:var(--enc);display:grid;place-items:center;margin:-26px 6px 2px;box-shadow:0 0 0 5px var(--enc),0 4px 10px rgba(0,0,0,.35)}
@@ -388,11 +389,12 @@ const lireLien = s => { s = String(s || '').trim(); const m = /[#&]s=([A-Za-z0-9
 const nsDe = id => id === idDe(API_URL) ? '' : 'c' + Array.from(id).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36) + '.';
 const clesSurTel = () => { try { return Object.keys(localStorage).filter(k => /^carnet\.(c[0-9a-z]+\.)?key$/.test(k) && JSON.parse(localStorage.getItem(k) || '""')); } catch (e) { return []; } };
 const connus = () => { try { const c = JSON.parse(localStorage.getItem('carnet.connus') || '{}'); return c && typeof c === 'object' ? c : {}; } catch (e) { return {}; } };
+const ID_ESSAI = 'carnet_essai_exemple_2026';   // 1.9.1 : carnet d'essai, entièrement dans le téléphone (aucun script, aucun envoi)
 let CARNET_PROPOSE = '';   // id d'un carnet reçu par lien, en attente de « Ouvrir ce carnet ? »
 function arriveeLien(id) {   // renvoie true si on peut ouvrir tout de suite (carnet déjà connu, ou aucune clé à protéger)
   let actuel = API_URL; try { actuel = JSON.parse(localStorage.getItem('carnet.url') || 'null') || API_URL; } catch (e) {}
   if (urlDe(id) === actuel) return false;
-  if (id === idDe(API_URL) || connus()[id] || !clesSurTel().length) return true;
+  if (id === idDe(API_URL) || id === ID_ESSAI || connus()[id] || !clesSurTel().length) return true;
   CARNET_PROPOSE = id; return false;
 }
 (function () {   // lien d'installation : lu et effacé AVANT tout le reste (historique, bouton retour)
@@ -401,7 +403,7 @@ function arriveeLien(id) {   // renvoie true si on peut ouvrir tout de suite (ca
   if (id && arriveeLien(id)) try { if (id === idDe(API_URL)) localStorage.removeItem('carnet.url'); else localStorage.setItem('carnet.url', JSON.stringify(urlDe(id))); } catch (e) {}
 })();
 const URL_CARNET = (function () { try { const u = JSON.parse(localStorage.getItem('carnet.url') || 'null'); return idDe(u) ? u : API_URL; } catch (e) { return API_URL; } })();
-const DEFAUT = URL_CARNET === API_URL;
+const DEFAUT = URL_CARNET === API_URL, ESSAI = idDe(URL_CARNET) === ID_ESSAI;
 const NS = nsDe(idDe(URL_CARNET));
 const COMMUN = { theme: 1, tab: 1, url: 1, connus: 1 };   // réglages communs à tous les carnets du téléphone
 const lienCarnet = () => location.origin + location.pathname + '#s=' + idDe(URL_CARNET);
@@ -510,6 +512,7 @@ const histo = () => S.d.historique.filter(x => !x.deleted);
 
 /* ================= API ================= */
 function api(action, extra, uid) {
+  if (ESSAI) return new Promise(ok => setTimeout(() => ok(apiEssai(action, extra || {})), 150));   // 1.9.1 : rien ne sort du téléphone
   const body = JSON.stringify(Object.assign({ action, key: S.key }, extra || {}, uid ? { uid } : {}));
   // 1.8 : délai maximal de 30 s (avant : une connexion figée bloquait la file sans message)
   const ab = window.AbortController ? new AbortController() : null, minu = ab ? setTimeout(() => ab.abort(), 30000) : null;
@@ -644,6 +647,8 @@ function apresAppel(op, res) {
 function rendre(silencieux) {
   if (!S.d) { $('#main').innerHTML = '<div class="empty">Chargement du carnet…</div>'; return; }
   rafraichirEtats();
+  const tInv = document.querySelector('.tab[data-act="tab:inventaire"]'); if (tInv) tInv.hidden = !mod('inventaire');
+  if (S.tab === 'inventaire' && !mod('inventaire')) S.tab = 'bord';
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.act === 'tab:' + S.tab));
   const T = { bord: [nomCarnet(), 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], inventaire: ['Inventaire', 'Assurance MAIF · biens, factures, photos'] }[S.tab];
   $('#htitle').textContent = T[0]; $('#hsub').textContent = (DEFAUT || S.tab === 'bord' ? '' : '📒 ' + nomCarnet() + ' · ') + T[1];   // 1.9 : on voit toujours dans quel carnet on est
@@ -662,7 +667,7 @@ function vBord() {
   const H = histo(), m0 = today().slice(0, 7), an = addDays(today(), -365);
   const ceMois = H.filter(h => h.date.slice(0, 7) === m0).length, sur12 = H.filter(h => h.date > an).length;
   const val = valeurMobilier(), pf = S.d.plafond || 28000, pct = Math.round(100 * val / pf);
-  let h = carteAffiche() + carteMotivation() + `<div class="sec"><h2>Où en est le carnet</h2></div>
+  let h = (ESSAI ? `<div class="note" style="margin-bottom:10px">🧪 <b>Carnet d'essai</b> : données inventées, rien ne quitte ce téléphone. Note un passage, ajoute un bien, essaie tout.<div class="btnrow" style="margin-top:8px"><button class="mini" data-act="essai-zero">Recommencer l'essai</button><button class="mini" data-act="essai-quitter">Quitter l'essai</button></div></div>` : '') + carteAffiche() + carteMotivation() + `<div class="sec"><h2>Où en est le carnet</h2></div>
   <div class="kpis">
     <button class="kpi k-red" data-act="etat" data-e="EN RETARD"><span class="lab">En retard</span><span class="val">${ret}</span><span class="sub">à faire maintenant</span></button>
     <button class="kpi k-yel" data-act="etat" data-e="BIENTÔT"><span class="lab">Sous 30 jours</span><span class="val">${bt}</span><span class="sub">à caler dans l'agenda</span></button>
@@ -672,8 +677,8 @@ function vBord() {
   <div class="inkcards">
     <div class="ink"><div class="lab">Carnet à jour</div><div class="val">${ajour} %</div><div class="gauge"><i style="width:${ajour}%"></i></div><div class="sub">des tâches sans retard</div></div>
     <div class="ink"><div class="lab">Passages</div><div class="val">${ceMois} <span style="font-size:15px;font-weight:400">ce mois</span></div><div class="sub">${sur12} sur les 12 derniers mois</div></div>
-    <button class="ink wide" data-act="tab:inventaire" style="text-align:left"><div class="lab">Valeur du mobilier</div><div class="val">${e0(val)} <span style="font-size:14px;font-weight:400;color:var(--light)">/ ${e0(pf)} assurés</span></div>
-      <div class="gauge"><i style="width:${Math.min(pct, 100)}%;background:${pct >= 95 ? 'var(--red)' : pct >= 90 ? 'var(--ora)' : 'var(--yel)'}"></i></div><div class="sub">${pct} % du plafond MAIF${pct >= 95 ? ' · ⚠️ demande un relèvement du plafond' : pct >= 90 ? ' · pense à faire relever le plafond' : ''}</div></button>
+    ${mod('inventaire') ? `<button class="ink wide" data-act="tab:inventaire" style="text-align:left"><div class="lab">Valeur du mobilier</div><div class="val">${e0(val)} <span style="font-size:14px;font-weight:400;color:var(--light)">/ ${e0(pf)} assurés</span></div>
+      <div class="gauge"><i style="width:${Math.min(pct, 100)}%;background:${pct >= 95 ? 'var(--red)' : pct >= 90 ? 'var(--ora)' : 'var(--yel)'}"></i></div><div class="sub">${pct} % du plafond MAIF${pct >= 95 ? ' · ⚠️ demande un relèvement du plafond' : pct >= 90 ? ' · pense à faire relever le plafond' : ''}</div></button>` : ''}
   </div>`;
   const prochains = E.filter(t => t.prochain).sort(ordreUrg).slice(0, 6);
   h += `<div class="sec"><h2>Prochains passages</h2><button class="lnk" data-act="tab:entretien">Tout voir ›</button></div><div class="list">`;
@@ -692,7 +697,7 @@ function vBord() {
     return `<button class="zline" style="width:100%;text-align:left" data-act="zone" data-z="${esc(z)}"><span class="zn">${esc(z)}</span><span class="gg ${p < 100 ? 'bad' : ''}">${'▰'.repeat(on)}${'▱'.repeat(10 - on)}</span><span class="pc">${p}%</span></button>`;
   }).join('') + '</div>';
   // contacts
-  h += `<div class="sec"><h2>Contacts</h2><button class="lnk" data-act="contact-new">+ Ajouter</button></div><div class="list">` +
+  if (mod('contacts')) h += `<div class="sec"><h2>Contacts</h2><button class="lnk" data-act="contact-new">+ Ajouter</button></div><div class="list">` +
     (S.d.contacts.length ? S.d.contacts.map(c => `<div class="item"><div class="grow tap" data-act="contact" data-id="${esc(c.id)}"><div class="ttl">${esc(c.nom || c.pourquoi)}</div><div class="desc">${esc(c.pourquoi)}${c.notes ? ' · ' + esc(c.notes) : ''}</div></div>
       ${c.tel ? `<a class="mini" href="tel:${esc(c.tel.replace(/\s/g, ''))}">${ICON.phone}</a>` : ''}${c.mail ? `<a class="mini" href="mailto:${esc(c.mail)}">${ICON.mail}</a>` : ''}</div>`).join('') : '<div class="empty">Aucun contact</div>') + '</div>';
   h += `<div class="foot">Fichier synchronisé · ${S.d.maj ? new Date(S.d.maj).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : ''}</div>`;
@@ -716,7 +721,7 @@ function vEntretien() {
   const segs = [['TOUT', E.length], ['EN RETARD', c('EN RETARD')], ['BIENTÔT', c('BIENTÔT')], ['RAS', c('RAS')]];
   if (c('À PLANIFIER')) segs.push(['À PLANIFIER', c('À PLANIFIER')]);
   const C = S.d.consommables || [], CR = C.filter(c => c.racheter).length;
-  let h = `<button class="expbtn" data-act="conso"><span class="ic">🧴</span><span><b>Consommables</b><small>${CR ? CR + ' à racheter · ' : ''}${C.length} article${C.length > 1 ? 's' : ''} pour l'entretien</small></span><span class="chev">›</span></button>`;
+  let h = mod('consommables') ? `<button class="expbtn" data-act="conso"><span class="ic">🧴</span><span><b>Consommables</b><small>${CR ? CR + ' à racheter · ' : ''}${C.length} article${C.length > 1 ? 's' : ''} pour l'entretien</small></span><span class="chev">›</span></button>` : '';
   h += `<div class="seg">${segs.map(([k, n]) => `<button class="${S.fEt === k ? 'on' : ''}" data-act="fet" data-e="${k}">${k === 'À PLANIFIER' ? 'JAMAIS' : k}<small>${n}</small></button>`).join('')}</div>`;
   const zones = [...new Set(E.map(t => t.zone))];
   h += `<div class="chips"><button class="chip ${!S.fZone ? 'on' : ''}" data-act="fzone" data-z="">Toutes</button>${zones.map(z => `<button class="chip ${S.fZone === z ? 'on' : ''}" data-act="fzone" data-z="${esc(z)}">${esc(z)}</button>`).join('')}</div>`;
@@ -1326,20 +1331,23 @@ function trophees() {
   const I = S.d.inventaire.filter(b => b.categorie !== 'Travaux'), cine = S.d.inventaire.filter(b => b.piece === 'Salle ciné');
   const J = (S.d.jeux || []).filter(j => j.assure), C = S.d.consommables || [];
   const parfaits = moisListe(24).map(mois).filter(x => x && x.parfait).length;
+  const inv = mod('inventaire'), zoneFaite = re => { const Z = E.filter(t => re.test(t.zone)); return [Z.filter(t => t.dernier).length, Z.length || 1]; };
   const T = [
     { id: 'chiffon', ic: '🧽', nom: 'Premier coup de chiffon', desc: 'Noter un premier passage', prog: [nb, 1] },
     { id: 'rode', ic: '🔧', nom: 'Rodé', desc: '10 passages notés', prog: [nb, 10] },
     { id: 'ordre', ic: '✅', nom: 'Tout est en ordre', desc: 'Aucune tâche en retard', prog: [E.filter(t => t.etat !== 'EN RETARD').length, E.length] },
     { id: 'tour', ic: '🗺️', nom: 'Tour du propriétaire', desc: 'Chaque tâche du carnet faite au moins une fois', prog: [E.filter(t => t.dernier).length, E.length] },
     { id: 'pyro', ic: '♨️', nom: 'Pyromane', desc: 'Lancer une pyrolyse du four', prog: [H.some(h => /^four\b/i.test(h.element)) ? 1 : 0, 1] },
-    { id: 'aqua', ic: '🐠', nom: 'Aquariophile', desc: "3 entretiens d'aquarium d'affilée faits à l'heure", prog: [suiteAquarium(), 3] },
-    { id: 'cine', ic: '🎬', nom: 'Projectionniste', desc: 'Tous les biens de la salle ciné en photo', prog: [cine.filter(b => b.photo).length, cine.length] },
+    { id: 'aqua', ic: '🐠', nom: 'Aquariophile', desc: "3 entretiens d'aquarium d'affilée faits à l'heure", prog: [suiteAquarium(), 3], si: DEFAUT },
+    { id: 'aqua', ic: '🚿', nom: 'Eau claire', desc: 'Chaque tâche Salle de bain et WC faite au moins une fois', prog: zoneFaite(/salle de bain|wc/i), si: !DEFAUT },
+    { id: 'cine', ic: '🎬', nom: 'Projectionniste', desc: 'Tous les biens de la salle ciné en photo', prog: [cine.filter(b => b.photo).length, cine.length], si: DEFAUT },
+    { id: 'cine', ic: '🍳', nom: 'Chef de cuisine', desc: 'Chaque tâche Cuisine faite au moins une fois', prog: zoneFaite(/cuisine/i), si: !DEFAUT },
     { id: 'serie4', ic: '🔥', nom: 'Sur la lancée', desc: "4 semaines d'affilée sans retard", prog: [sr.best, 4] },
     { id: 'mois', ic: '📅', nom: 'Mois parfait', desc: 'Un mois entier sans aucun retard', prog: [parfaits, 1] },
-    { id: 'papa', ic: '📸', nom: 'Paparazzi', desc: "Tout l'inventaire en photo (hors travaux)", prog: [I.filter(b => b.photo).length, I.length] },
-    { id: 'beton', ic: '🛡️', nom: 'Dossier béton', desc: 'Chaque bien a un prix et une facture ou une photo', prog: [I.filter(b => b.prix && (b.facture || b.photo)).length, I.length] },
-    { id: 'ludo', ic: '🎲', nom: 'Ludothécaire', desc: 'Tous les jeux assurés ont une valeur', prog: [J.filter(j => j.valeur).length, J.length || 1] },
-    { id: 'conso', ic: '🛒', nom: 'Prévoyant', desc: "Un prix et un lien d'achat pour chaque consommable", prog: [C.filter(c => c.prix && c.lien).length, C.length || 1] },
+    { id: 'papa', ic: '📸', nom: 'Paparazzi', desc: "Tout l'inventaire en photo (hors travaux)", prog: [I.filter(b => b.photo).length, I.length], si: inv },
+    { id: 'beton', ic: '🛡️', nom: 'Dossier béton', desc: 'Chaque bien a un prix et une facture ou une photo', prog: [I.filter(b => b.prix && (b.facture || b.photo)).length, I.length], si: inv },
+    { id: 'ludo', ic: '🎲', nom: 'Ludothécaire', desc: 'Tous les jeux assurés ont une valeur', prog: [J.filter(j => j.valeur).length, J.length || 1], si: mod('jeux') && inv },
+    { id: 'conso', ic: '🛒', nom: 'Prévoyant', desc: "Un prix et un lien d'achat pour chaque consommable", prog: [C.filter(c => c.prix && c.lien).length, C.length || 1], si: mod('consommables') },
     { id: 'serie12', ic: '🔥', nom: 'Trimestre impeccable', desc: "12 semaines d'affilée sans retard", prog: [sr.best, 12] },
     { id: 'pilier', ic: '🏗️', nom: 'Pilier du carnet', desc: '50 passages notés', prog: [nb, 50] },
     { id: 'serie26', ic: '👑', nom: 'Six mois sans faute', desc: "26 semaines d'affilée sans retard", prog: [sr.best, 26] },
@@ -1347,6 +1355,7 @@ function trophees() {
     { id: 'annee', ic: '🎂', nom: 'Un an de carnet', desc: 'Un an depuis le premier passage noté', prog: [debutCarnet() ? Math.min(365, diffJ(today(), debutCarnet())) : 0, 365] }
   ];
   const deja = new Set(jeu().gagnes);
+  T.splice(0, T.length, ...T.filter(t => !('si' in t) || t.si));   // 1.9.1 : trophées selon les modules du carnet
   T.forEach((t, i) => {
     t.ok = deja.has(t.id) || (t.prog[1] > 0 && t.prog[0] >= t.prog[1]);
     t.theme = THEMES.find(x => x.tr === t.id);
@@ -1435,7 +1444,7 @@ function ouvrirTrophees() {
     <div class="pellicule" id="film">${film}</div>
     <p class="muted" style="font-size:12px;margin:6px 2px 0">★ mois parfait (aucun retard) · % des jours sans retard · le mois en cours est en pointillés</p>
     <div class="lbl" style="margin-top:16px">Thèmes de l'appli</div>
-    <div class="themes">${THEMES.map(th => {
+    <div class="themes">${THEMES.filter(th => !th.tr || T.some(t => t.id === th.tr)).map(th => {
       const tr = th.tr ? T.find(t => t.id === th.tr) : null, ok = !tr || tr.ok;
       return `<button class="th ${j.theme === th.id ? 'on' : ''} ${ok ? '' : 'lock'}" data-act="theme" data-t="${th.id}">
         <div class="sw">${th.sw.map(c => `<i style="background:${c}"></i>`).join('')}</div><div class="bd" style="background:${th.bd}"></div>
@@ -1727,15 +1736,15 @@ function ouvrirTrophee(id) {
 }
 function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulement le jeu)
   S.form = { mode: 'aide', depuis: depuis || 'trophees' };
-  const d = S.d || {}, inv = !!((d.inventaire || []).length || ((d.listes || {}).pieces || []).length);
-  const bloc = (titre, lignes) => `<div class="lbl">${titre}</div><div class="kv">${lignes.map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join('')}</div>`;
+  const d = S.d || {}, inv = mod('inventaire') && !!((d.inventaire || []).length || ((d.listes || {}).pieces || []).length || !DEFAUT);
+  const bloc = (titre, lignes) => `<div class="lbl">${titre}</div><div class="kv">${lignes.filter(Boolean).map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join('')}</div>`;
   let h = bloc('L\'entretien', [
     ['🔧 Les tâches', 'Chaque tâche a une fréquence (tous les 3 mois, tous les ans…). Le carnet calcule la prochaine date à partir du dernier passage.'],
     ['✓ C\'est fait', 'Touche une tâche, puis « ✓ C\'est fait » : choisis le jour (aujourd\'hui, hier…) et, si tu veux, la durée. La prochaine date se recalcule aussitôt.'],
     ['🚦 Les états', '<b>En retard</b> dès le lendemain de la date prévue · <b>Sous 30 jours</b> : à caler dans l\'agenda · <b>RAS</b> : rien à signaler · <b>Jamais faites</b> : à planifier une 1re fois.'],
     ['✉️ Le mail', 'Le matin où une tâche arrive à échéance, un mail part, <b>une seule fois</b> : jamais de relance. La tâche reste en retard dans l\'appli jusqu\'à « C\'est fait ».'],
     ['📒 Historique', 'Tous les passages notés. Touche un passage pour corriger sa date ou sa durée, ou le supprimer (il faut toucher deux fois).'],
-    ['🧴 Consommables', 'Dans l\'onglet Entretien : les produits d\'entretien et ce qu\'il reste à racheter.']
+    mod('consommables') && ['🧴 Consommables', 'Dans l\'onglet Entretien : les produits d\'entretien et ce qu\'il reste à racheter.']
   ]);
   if (inv) h += bloc('L\'inventaire', [
     ['🛋️ Les biens', 'Chaque objet de l\'appartement avec sa pièce, son prix, sa facture et ses photos. Cherche par objet, marque ou magasin.'],
@@ -1743,7 +1752,7 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
     ['📊 Plafond MAIF', 'La jauge compare la valeur du mobilier (hors travaux) au plafond assuré. À 95 %, un mail te prévient d\'en demander le relèvement.'],
     ['📄 Dossier assurance', 'Coche les biens importants (« Ajouter au dossier MAIF »), puis « Dossier pour l\'assurance » : un PDF et un Word avec fiches, photos et factures. Il se fabrique en arrière-plan, un mail arrive avec les liens.']
   ]);
-  h += bloc('Les contacts', [['📇 Contacts', 'Sur l\'accueil : plombier, SAV, syndic… Les boutons appellent ou écrivent directement. Toucher un contact permet de le modifier ; le supprimer demande deux appuis.']]);
+  if (mod('contacts')) h += bloc('Les contacts', [['📇 Contacts', 'Sur l\'accueil : plombier, SAV, syndic… Les boutons appellent ou écrivent directement. Toucher un contact permet de le modifier ; le supprimer demande deux appuis.']]);
   h += bloc('Sans réseau', [
     ['📶 Hors connexion', 'Tout se note même sans réseau (cave, salle de bain). Le point en haut indique l\'envoi en cours ; les saisies partent seules au retour du réseau, sans doublon ni perte.'],
     ['⚙️ Réglages', 'L\'état du mail, le nombre de saisies en attente, la version de l\'appli, et le bouton pour actualiser.']
@@ -1751,6 +1760,7 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
   h += bloc('Partage et autres carnets', [
     ['📤 Partager', 'Réglages › « Partager le lien de ce carnet » : envoie le lien par message, et la clé d\'accès dans un autre message. Le lien ouvre le carnet sur l\'autre téléphone, la clé le déverrouille.'],
     ['🔗 Lien reçu', 'Ouvre le lien reçu, puis tape la clé de ce carnet (si un autre carnet est déjà sur le téléphone, l\'appli demande d\'abord « Ouvrir ce carnet ? »). Sur iPhone, si l\'appli installée ne le reconnaît pas, touche « J\'ai reçu un lien de carnet » et colle le lien.'],
+    ['🧪 Carnet d\'essai', 'Réglages › « Essayer avec un carnet d\'exemple » : un carnet aux données inventées, sans clé, où rien n\'est envoyé. Idéal pour découvrir l\'appli ou la montrer ; « Quitter l\'essai » ramène à ton carnet.'],
     ['📒 Plusieurs carnets', 'Chaque carnet garde ses propres données et ses saisies en attente : rien ne passe d\'un carnet à l\'autre. Les carnets déjà ouverts sur le téléphone sont dans Réglages, pour passer de l\'un à l\'autre.']
   ]);
   h += bloc('Le jeu', [
@@ -1772,7 +1782,7 @@ function ouvrirReglages() {
   S.form = { mode: 'reglages' };
   ouvrir(tete('Réglages') + `
     <div class="kv">
-      <div>Mail d'échéance</div><div>${sv.mailActif ? '✅ actif · une seule fois par tâche, le matin de son échéance' : '⚠️ inactif : lance « installer » dans Apps Script'}</div>
+      <div>Mail d'échéance</div><div>${sv.mailActif ? '✅ actif · une seule fois par tâche, le matin de son échéance' : ESSAI ? 'aucun mail dans le carnet d\'essai' : '⚠️ inactif : lance « installer » dans Apps Script'}</div>
       <div>Envoyé à</div><div>${esc(sv.destinataire || '—')}</div>
       <div>Dernier mail</div><div class="mono">${sv.dernierMail ? new Date(sv.dernierMail).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'aucun pour l\'instant'}</div>
       <div>Écritures</div><div>${S.queue.length ? S.queue.length + ' en attente d\'envoi' : 'tout est enregistré'}</div>
@@ -1780,30 +1790,86 @@ function ouvrirReglages() {
     </div>
     <button class="go" data-act="trophees">🏆 Trophées, thèmes et vacances</button>
     <button class="go sec2" data-act="aide-r">❓ Comment ça marche</button>
-    <button class="go sec2" data-act="mailtest">Envoyer un mail de test</button>
+    ${ESSAI ? '' : '<button class="go sec2" data-act="mailtest">Envoyer un mail de test</button>'}
     <div class="btnrow"><button class="go sec2" data-act="refresh">↻ Actualiser</button>${sheetUrl() ? `<a class="go sec2" href="${esc(sheetUrl())}" target="_blank" rel="noopener">Ouvrir le Sheet</a>` : ''}</div>
     <div class="lbl">Partage et autres carnets</div>
     <div class="list">
       <div class="item tap" data-act="partager"><span>📤</span><div class="grow"><div class="ttl">Partager le lien de ce carnet</div><div class="desc">Pour l'ouvrir sur un autre téléphone. Envoie la clé dans un autre message.</div></div></div>
       ${autresCarnets().map(c => `<div class="item tap" data-act="aller-carnet" data-id="${esc(c.id)}"><span>📒</span><div class="grow"><div class="ttl">Aller au carnet « ${esc(c.nom)} »</div><div class="desc">Déjà ouvert sur ce téléphone</div></div></div>`).join('')}
+      ${ESSAI ? '' : '<div class="item tap" data-act="essai"><span>🧪</span><div class="grow"><div class="ttl">Essayer avec un carnet d\'exemple</div><div class="desc">Données inventées, rien n\'est envoyé. Pratique pour montrer l\'appli.</div></div></div>'}
       <div class="item tap" data-act="autre-carnet"><span>🔗</span><div class="grow"><div class="ttl">J'ai reçu un lien de carnet</div><div class="desc">Ouvrir le carnet de quelqu'un d'autre (avec sa clé)</div></div></div>
     </div>
-    <button class="go danger" data-act="logout">Changer de clé d'accès</button>`);
+    ${ESSAI ? '<button class="go danger" data-act="essai-quitter">Quitter le carnet d\'essai</button>' : '<button class="go danger" data-act="logout">Changer de clé d\'accès</button>'}`);
 }
 
+/* 1.9.1 : modules par carnet. Le script peut dire lesquels il a (serveur.modules) ; sinon on ne devine que pour le carnet
+   T4 connu (entretien, contacts, consommables), et tout est affiché pour les autres (un carnet neuf vide doit pouvoir
+   ajouter son 1er bien). L'entretien est toujours là. */
+const ID_T4 = 'AKfycbysEJTeMDjtS2WHicGgse_l9PJ0h6NL7mYTExIOTW1_aHGp31UzkBzhhTmnsFg1NXsy';
+function mod(m) {
+  if (m === 'entretien') return true;
+  const sm = S.d && S.d.serveur && S.d.serveur.modules;
+  if (Array.isArray(sm)) return sm.includes(m);
+  if (idDe(URL_CARNET) === ID_T4) return ['contacts', 'consommables'].includes(m);
+  return true;
+}
+/* 1.9.1 : carnet d'essai. Données inventées (dates calées sur aujourd'hui) ; les saisies restent dans le téléphone. */
+function donneesEssai() {
+  const t = today(), j = n => addDays(t, n);
+  const T = [['Cuisine', 'Hotte', 'Nettoyer les filtres', 3, -120], ['Cuisine', 'Four', 'Pyrolyse', 6, -170], ['Salle de bain', 'Bonde de douche', 'Déboucher et rincer', 1, -10],
+    ['Salle de bain', 'Joints', 'Vérifier les joints silicone', 12, null], ['Séjour', 'Détecteur de fumée', 'Tester et changer la pile', 6, -200], ['Chambre', 'Matelas', 'Retourner le matelas', 6, -60],
+    ['Buanderie', 'Lave-linge', 'Nettoyer le filtre et le joint', 2, -50], ['Entrée', 'VMC', 'Nettoyer les bouches', 6, -30]];
+  let r = 4; const hist = [];
+  const ent = T.map(([zone, element, intervention, freq, il]) => {
+    if (il != null) { hist.push({ row: ++r, date: j(il), element, zone, duree: 15 }); hist.push({ row: ++r, date: plusFreq(j(il), -freq) > j(-400) ? plusFreq(j(il), -freq) : j(il - 90), element, zone, duree: '' }); }
+    const dernier = il == null ? '' : j(il), prochain = dernier ? plusFreq(dernier, freq) : '';
+    return { row: ++r, zone, element, intervention, freq, freqTxt: 'tous les ' + (freq === 12 ? 'ans' : freq + ' mois'), dernier, prochain, jours: null, etat: '', outils: '' };
+  });
+  const bien = (piece, categorie, objet, marque, prix, garantie, achat, statut) => ({ row: ++r, piece, categorie, objet, marque, serie: '', magasin: 'Magasin d\'exemple', date: j(achat), prix, garantie,
+    finGarantie: garantie ? addDays(j(achat), Math.round(garantie * 365.25)) : '', statut, facture: '', factureLabel: '', photo: '', photoLabel: '', remarque: '', maif: false, prixAuto: false });
+  return {
+    entretien: ent, historique: hist.sort((a, b) => a.date < b.date ? -1 : 1),
+    inventaire: [bien('Buanderie', 'Électroménager', 'Lave-linge', 'Marque A', 450, 2, -700, 'EXPIRE BIENTÔT'), bien('Séjour', 'Mobilier', 'Canapé', 'Marque B', 900, 0, -400, ''), bien('Séjour', 'Multimédia', 'Télévision', 'Marque C', 600, 2, -100, 'COUVERTE')],
+    jeux: [], contacts: [{ row: ++r, pourquoi: 'Plombier', nom: 'Plomberie d\'exemple', mail: '', tel: '01 02 03 04 05', notes: 'Fuites, chauffe-eau' }, { row: ++r, pourquoi: 'Syndic', nom: 'Syndic d\'exemple', mail: '', tel: '', notes: '' }],
+    consommables: [{ row: ++r, article: 'Pastilles lave-vaisselle', pour: 'Lave-vaisselle', prix: 12, lien: '', racheter: false, remarque: '' }, { row: ++r, article: 'Filtres de hotte', pour: 'Hotte', prix: 15, lien: '', racheter: true, remarque: '' }, { row: ++r, article: 'Vinaigre blanc', pour: 'Détartrage', prix: 2, lien: '', racheter: false, remarque: '' }],
+    jeu: {}, listes: { pieces: ['Cuisine', 'Séjour', 'Chambre', 'Salle de bain', 'Buanderie', 'Entrée'], categories: ['Électroménager', 'Mobilier', 'Multimédia', 'Travaux'] }, plafond: 20000,
+    serveur: { nom: 'Carnet d\'essai', mailActif: false, dernierMail: '', destinataire: '', version: 'essai', modules: ['inventaire', 'contacts', 'consommables'] }, aujourdhui: t, maj: new Date().toISOString()
+  };
+}
+function apiEssai(action, x) {
+  const non = { ok: false, error: 'ESSAI', message: 'Pas disponible dans le carnet d\'essai' };
+  if (action === 'data') { const c = LS.get('cache', null); return { ok: true, data: c ? JSON.parse(JSON.stringify(c)) : donneesEssai() }; }
+  if (action === 'photos-liste') return { ok: true, total: 0, photos: [] };
+  if (action === 'export-statut') return { ok: true, statut: null, dernier: null };
+  if (/^(export|photo|mail-test)/.test(action)) return non;
+  const r = LS.get('essaiRow', 500) + 1; LS.set('essaiRow', r);
+  return { ok: true, row: x.row || r };
+}
+function quitterEssai() {   // retour au carnet principal, ou au dernier autre carnet ouvert s'il n'y a pas de clé T3 sur le téléphone
+  const c = connus(); delete c[ID_ESSAI]; LS.set('connus', c); ['cache', 'queue', 'key', 'essaiRow'].forEach(k => LS.del(k));
+  const autre = Object.keys(c).find(id => id !== idDe(API_URL) && ID_OK.test(id));
+  changerCarnet(!clesSurTel().includes('carnet.key') && autre ? urlDe(autre) : API_URL);
+}
+/* 1.9.1 : un autre carnet ne peut pas se faire appeler comme le carnet principal (sinon on pourrait y taper la clé du T3) */
+function nomSur(n, id) {
+  n = String(n || '').replace(/\s+/g, ' ').trim().slice(0, 30); if (!n) return '';
+  if ((id || idDe(URL_CARNET)) === idDe(API_URL)) return n;
+  const c = x => norm(x).replace(/[^a-z0-9]/g, '');
+  return /(^|carnet|appart\w*|logement)t3$/.test(c(n)) || c(n) === c('Carnet · T3') ? '' : n;
+}
 function nomCarnet() {   // 1.9 : le script peut donner un nom (serveur.nom) ; sinon « Carnet · T3 » pour le carnet principal
-  const n = (S.d && S.d.serveur && S.d.serveur.nom) || (connus()[idDe(URL_CARNET)] || {}).nom;
-  return n ? String(n).slice(0, 30) : DEFAUT ? 'Carnet · T3' : 'Autre carnet';
+  const n = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);
+  return n || (DEFAUT ? 'Carnet · T3' : 'Autre carnet');
 }
 function retenirCarnet() {   // 1.9 : carnets ouverts avec succès sur ce téléphone (nom affiché, pas de question au prochain lien)
-  const c = connus(), id = idDe(URL_CARNET), n = S.d && S.d.serveur && S.d.serveur.nom;
-  c[id] = { nom: n ? String(n).slice(0, 30) : (c[id] || {}).nom || (DEFAUT ? 'Carnet · T3' : '') };
+  const c = connus(), id = idDe(URL_CARNET), n = nomSur(S.d && S.d.serveur && S.d.serveur.nom);
+  c[id] = { nom: n || nomSur((c[id] || {}).nom) || (DEFAUT ? 'Carnet · T3' : '') };
   LS.set('connus', c);
 }
 function autresCarnets() {   // carnets déjà ouverts sur ce téléphone, sauf celui-ci
   const c = connus(), ici = idDe(URL_CARNET);
   if (!c[idDe(API_URL)] && clesSurTel().includes('carnet.key')) c[idDe(API_URL)] = { nom: 'Carnet · T3' };
-  return Object.keys(c).filter(id => id !== ici && ID_OK.test(id)).map(id => ({ id, nom: c[id].nom || 'Carnet sans nom' }));
+  return Object.keys(c).filter(id => id !== ici && ID_OK.test(id)).map(id => ({ id, nom: nomSur(c[id].nom, id) || 'Autre carnet' }));
 }
 function proposerCarnet() {   // 1.9 (carnet-code) : « Ouvrir ce carnet ? » à l'arrivée d'un lien inconnu
   const id = CARNET_PROPOSE; if (!id) return;
@@ -1830,7 +1896,7 @@ function verrouiller(msg, annulable, lienSeul) {   // lienSeul : écran « J'ai 
   const peutAnnuler = annulable && S.key && S.d;
   const retourT3 = !DEFAUT && clesSurTel().includes('carnet.key');   // seulement si le carnet T3 a déjà été ouvert ici
   const aide = 'Pas ton carnet ? Touche « J\'ai reçu un lien de carnet » et colle le lien reçu par message.';
-  const nomConnu = (S.d && S.d.serveur && S.d.serveur.nom) || (connus()[idDe(URL_CARNET)] || {}).nom;
+  const nomConnu = nomSur(S.d && S.d.serveur && S.d.serveur.nom) || nomSur((connus()[idDe(URL_CARNET)] || {}).nom);
   const titre = lienSeul ? 'J\'ai reçu un lien de carnet' : DEFAUT ? 'Carnet d\'entretien' : nomConnu ? esc(String(nomConnu).slice(0, 30)) : 'Carnet ouvert par lien';
   const sous = lienSeul ? 'Colle le lien reçu par message' : DEFAUT ? 'Tape la clé d\'accès de ton carnet' : nomConnu ? 'Carnet ouvert par lien · il ne reste que sa clé' : 'Il ne reste que la clé de ce carnet';
   l.innerHTML = `<div class="in"><img src="icon-192.png" alt=""><h1>${titre}</h1>
@@ -1953,6 +2019,9 @@ document.addEventListener('click', ev => {
     case 'logout': fermer(); LS.del('key'); S.key = ''; verrouiller(); break;
     case 'partager': partagerLien(); break;
     case 'autre-carnet': fermer(); verrouiller('', true, true); break;
+    case 'essai': changerCarnet(urlDe(ID_ESSAI)); break;
+    case 'essai-zero': LS.del('cache'); LS.del('queue'); LS.del('essaiRow'); location.reload(); break;
+    case 'essai-quitter': quitterEssai(); break;
     case 'aller-carnet': if (ID_OK.test(el.dataset.id || '')) changerCarnet(urlDe(el.dataset.id)); break;
   }
 });
@@ -1999,6 +2068,7 @@ charger = function (d) {
 } catch (e) {} })();
 idsLocaux();
 appliquerTheme(LS.get('theme', 'chantier'));
+if (ESSAI && !S.key) { S.key = 'essai'; LS.set('key', 'essai'); }
 if (!S.key || !apiUrl()) verrouiller(); else { rendre(); rafraichir(true); pomper(); }
 if (CARNET_PROPOSE) proposerCarnet();   // 1.9 : lien d'un carnet inconnu → on demande avant d'ouvrir
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
