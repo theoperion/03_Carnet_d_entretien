@@ -1545,7 +1545,7 @@ function carteMotivation() {
   const filtreOk = !E.some(t => /aquarium/i.test(t.zone + ' ' + t.element) && t.etat === 'EN RETARD');
   const vac = enVacances(today()), mnom = MOIS[new Date().getMonth()];
   const pm = bm.total ? Math.round(100 * bm.faites / bm.total) : 100;
-  return `<button class="motiv" data-act="trophees">${aquariumHtml(T, ajour, filtreOk)}
+  return `<button class="motiv" data-act="trophees">${LS.get('aquarium', true) ? aquariumHtml(T, ajour, filtreOk) : ''}
     <div class="mrow"><div><div class="l">${vac ? '🏖 Vacances' : 'Série'}</div><div class="v">${vac ? 'en pause' : '🔥 ' + sr.cur + ' sem.'}</div></div>
     <div><div class="l">${mnom}</div><div class="v">${bm.faites}/${bm.total} <span style="font-size:12px;font-weight:400">tâches</span></div><div class="gauge"><i style="width:${pm}%"></i></div></div>
     <div><div class="l">Trophées</div><div class="v">🏆 ${T.filter(t => t.ok).length}/${T.length}</div></div></div></button>`;
@@ -1899,7 +1899,7 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
   ]);
   h += bloc('Le jeu', [
     ['🎬 À l\'affiche', 'En haut de l\'accueil : la chose la plus urgente à faire, avec la scène de sa zone. En retard, le décor se dégrade ; ‹ › pour voir les suivantes. Quand tout est à jour : relâche' + (EST_T3 ? ', la salle ciné est à toi.' : ' !')],
-    ['🐟 Aquarium', 'Un poisson par trophée gagné. L\'eau se trouble quand des tâches sont en retard. ' + (EST_T3 ? 'Le filtre fait des bulles, sauf si l\'entretien de l\'aquarium est en retard.' : '')],
+    ['🐟 Aquarium', 'Un poisson par trophée gagné (Réglages : on peut le masquer). L\'eau se trouble quand des tâches sont en retard. ' + (EST_T3 ? 'Le filtre fait des bulles, sauf si l\'entretien de l\'aquarium est en retard.' : '')],
     ['🔥 Série', 'Nombre de semaines d\'affilée (du lundi au dimanche) sans aucune tâche en retard.'],
     ['🎞 Pellicule', 'Un photogramme par mois : ★ si le mois entier s\'est passé sans retard, sinon la part des jours sans retard.'],
     ['🏆 Trophées', 'Calculés à partir de ton historique' + (inv ? ' et de l\'inventaire' : '') + '. Une fois gagné, un trophée reste gagné. Touche un trophée pour voir comment l\'obtenir.'],
@@ -1923,6 +1923,7 @@ function ouvrirReglages() {
       <div>Version</div><div class="mono">app ${VERSION} · api ${esc(sv.version || '?')}</div>
     </div>
     <button class="go" data-act="trophees">🏆 Trophées, thèmes et vacances</button>
+    <div class="list" style="margin:8px 0"><div class="item tap" data-act="aquarium-bascule"><span>🐟</span><div class="grow"><div class="ttl">Aquarium sur l'accueil</div><div class="desc">${LS.get('aquarium', true) ? 'Affiché : un poisson par trophée. Touche pour le masquer.' : 'Masqué. Touche pour le réafficher.'}</div></div><span class="badge">${LS.get('aquarium', true) ? 'Affiché' : 'Masqué'}</span></div></div>
     <button class="go sec2" data-act="aide-r">❓ Comment ça marche</button>
     ${ESSAI ? '' : '<button class="go sec2" data-act="mailtest">Envoyer un mail de test</button>'}
     <div class="btnrow"><button class="go sec2" data-act="refresh">↻ Actualiser</button>${sheetUrl() ? `<a class="go sec2" href="${esc(sheetUrl())}" target="_blank" rel="noopener">Ouvrir le Sheet</a>` : ''}</div>
@@ -2175,6 +2176,7 @@ document.addEventListener('click', ev => {
     case 'essai': changerCarnet(urlDe(ID_ESSAI)); break;
     case 'essai-zero': LS.del('cache'); LS.del('queue'); LS.del('essaiRow'); location.reload(); break;
     case 'essai-quitter': quitterEssai(); break;
+    case 'aquarium-bascule': LS.set('aquarium', !LS.get('aquarium', true)); ouvrirReglages(); rendre(true); toast(LS.get('aquarium', true) ? '🐟 Aquarium affiché' : 'Aquarium masqué'); break;   // 1.9.7 : réglage par carnet
     case 'aller-carnet': if (ID_OK.test(el.dataset.id || '')) changerCarnet(urlDe(el.dataset.id)); break;
   }
 });
