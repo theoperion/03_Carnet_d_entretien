@@ -382,20 +382,32 @@ const ID_OK = /^[A-Za-z0-9_-]{20,120}$/;
 const urlDe = id => 'https://script.google.com/macros/s/' + id + '/exec';
 const idDe = u => { const m = /^https:\/\/script\.google\.com\/macros\/s\/([A-Za-z0-9_-]{20,120})\/exec$/.exec(String(u || '').trim()); return m ? m[1] : ''; };
 const lireLien = s => { s = String(s || '').trim(); const m = /[#&]s=([A-Za-z0-9_-]+)/.exec(s); return m && ID_OK.test(m[1]) ? m[1] : idDe(s); };
+/* 1.9 (carnet-code) : un lien inconnu ne fait plus changer de carnet sans demander, dès qu'une clé existe sur le téléphone
+   (un faux carnet ne doit jamais pouvoir s'ouvrir à la place du vrai sans que la personne le voie). */
+const nsDe = id => id === idDe(API_URL) ? '' : 'c' + Array.from(id).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36) + '.';
+const clesSurTel = () => { try { return Object.keys(localStorage).filter(k => /^carnet\.(c[0-9a-z]+\.)?key$/.test(k) && JSON.parse(localStorage.getItem(k) || '""')); } catch (e) { return []; } };
+const connus = () => { try { const c = JSON.parse(localStorage.getItem('carnet.connus') || '{}'); return c && typeof c === 'object' ? c : {}; } catch (e) { return {}; } };
+let CARNET_PROPOSE = '';   // id d'un carnet reçu par lien, en attente de « Ouvrir ce carnet ? »
+function arriveeLien(id) {   // renvoie true si on peut ouvrir tout de suite (carnet déjà connu, ou aucune clé à protéger)
+  let actuel = API_URL; try { actuel = JSON.parse(localStorage.getItem('carnet.url') || 'null') || API_URL; } catch (e) {}
+  if (urlDe(id) === actuel) return false;
+  if (id === idDe(API_URL) || connus()[id] || !clesSurTel().length) return true;
+  CARNET_PROPOSE = id; return false;
+}
 (function () {   // lien d'installation : lu et effacé AVANT tout le reste (historique, bouton retour)
   const id = lireLien(location.hash);
   if (location.hash) try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
-  if (id) try { localStorage.setItem('carnet.url', JSON.stringify(urlDe(id))); } catch (e) {}
+  if (id && arriveeLien(id)) try { if (id === idDe(API_URL)) localStorage.removeItem('carnet.url'); else localStorage.setItem('carnet.url', JSON.stringify(urlDe(id))); } catch (e) {}
 })();
 const URL_CARNET = (function () { try { const u = JSON.parse(localStorage.getItem('carnet.url') || 'null'); return idDe(u) ? u : API_URL; } catch (e) { return API_URL; } })();
 const DEFAUT = URL_CARNET === API_URL;
-const NS = DEFAUT ? '' : 'c' + Array.from(idDe(URL_CARNET)).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36) + '.';
-const COMMUN = { theme: 1, tab: 1, url: 1 };   // réglages communs à tous les carnets du téléphone
+const NS = nsDe(idDe(URL_CARNET));
+const COMMUN = { theme: 1, tab: 1, url: 1, connus: 1 };   // réglages communs à tous les carnets du téléphone
 const lienCarnet = () => location.origin + location.pathname + '#s=' + idDe(URL_CARNET);
 window.addEventListener('hashchange', () => {   // lien ouvert alors que l'appli est déjà ouverte
   const id = lireLien(location.hash); if (!id) return;
   try { history.replaceState(history.state, '', location.pathname + location.search); } catch (e) {}
-  if (urlDe(id) !== URL_CARNET) changerCarnet(urlDe(id));
+  if (arriveeLien(id)) changerCarnet(urlDe(id)); else if (CARNET_PROPOSE) proposerCarnet();
 });
 function changerCarnet(u) { try { if (u === API_URL) localStorage.removeItem('carnet.url'); else localStorage.setItem('carnet.url', JSON.stringify(u)); } catch (e) {} location.reload(); }
 // 1.8.6 : l'adresse du Sheet n'est plus écrite ici (dépôt public) : le script la donne après la clé
@@ -411,6 +423,9 @@ const LS = {
   del(k) { try { localStorage.removeItem(LS.n(k)); } catch (e) {} }
 };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// 1.9 : un carnet peut venir d'un autre script : liens web seulement (jamais « javascript: »), images en data:image ou https
+const hrefSur = u => { u = String(u == null ? '' : u).trim(); if (/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(u)) u = 'https://' + u; return /^https?:\/\//i.test(u) ? esc(u) : 'about:blank'; };
+const srcSur = u => { u = String(u == null ? '' : u).trim(); return /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+\/=]+$/i.test(u) || /^https:\/\//i.test(u) ? esc(u) : ''; };
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 const uid = () => 'l' + Math.random().toString(36).slice(2, 9);
 const pad = n => String(n).padStart(2, '0');
@@ -499,13 +514,26 @@ function api(action, extra, uid) {
 }
 const nouvelUid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 function setSync(s) { $('#dot').className = 'dot' + (s === 'sync' ? ' sync' : s === 'off' ? ' off' : ''); }
+/* 1.9 (carnet-code) : les données d'un autre carnet ne sont pas forcément sûres : nombres et dates remis en forme dès
+   l'arrivée (un texte piégé dans « garantie » ou « durée » ne peut plus devenir du code à l'écran). */
+const NUMS = ['row', 'freq', 'jours', 'duree', 'prix', 'garantie', 'valeur', 'joueursMin', 'joueursMax'], DATES = ['dernier', 'prochain', 'date', 'finGarantie', 'achat'];
+function nettoyer(d) {
+  Object.keys(d || {}).forEach(k => { if (Array.isArray(d[k])) d[k].forEach(x => {
+    if (!x || typeof x !== 'object') return;
+    NUMS.forEach(n => { if (n in x && x[n] !== '' && x[n] != null && typeof x[n] !== 'number') x[n] = isFinite(+String(x[n]).replace(',', '.')) ? +String(x[n]).replace(',', '.') : ''; });
+    DATES.forEach(n => { if (n in x && x[n] && !/^\d{4}-\d{2}-\d{2}$/.test(x[n])) x[n] = ''; });
+  }); });
+  if (d && typeof d.plafond !== 'number') d.plafond = +d.plafond || 0;
+  return d;
+}
 function charger(d) {
+  nettoyer(d);
   // conserve les passages locaux pas encore envoyés
   const enFile = new Set(S.queue.filter(o => o.op === 'fait').map(o => o.id || (o.h && o.h.id)));
   const loc = S.d ? S.d.historique.filter(x => x.pending && !x.row && enFile.has(x.id)) : [];   // 1.8 : plus de passage « fantôme » resté en « envoi… »
   S.d = d; S.d.historique = d.historique.concat(loc.filter(l => !d.historique.some(h => h.row && h.element === l.element && h.date === l.date && !l.row)));
   if (loc.length) S.d.entretien.forEach(recalc);
-  rafraichirEtats(); sauver();
+  rafraichirEtats(); sauver(); retenirCarnet();
 }
 async function rafraichir(force) {
   if (!S.key || !apiUrl()) return;
@@ -613,7 +641,7 @@ function rendre(silencieux) {
   rafraichirEtats();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.act === 'tab:' + S.tab));
   const T = { bord: [nomCarnet(), 'Point du ' + frLong(today())], entretien: ['Entretien', 'Une tâche faite ? Appuie sur FAIT.'], histo: ['Historique', 'Tous les passages notés'], inventaire: ['Inventaire', 'Assurance MAIF · biens, factures, photos'] }[S.tab];
-  $('#htitle').textContent = T[0]; $('#hsub').textContent = T[1];
+  $('#htitle').textContent = T[0]; $('#hsub').textContent = (DEFAUT || S.tab === 'bord' ? '' : '📒 ' + nomCarnet() + ' · ') + T[1];   // 1.9 : on voit toujours dans quel carnet on est
   const y = scrollY;
   $('#main').innerHTML = `<div class="view">${({ bord: vBord, entretien: vEntretien, histo: vHisto, inventaire: vInventaire })[S.tab]()}</div>`;
   if (silencieux) scrollTo(0, y);
@@ -650,7 +678,7 @@ function vBord() {
   const gs = S.d.inventaire.filter(b => b.statut === 'EXPIRE BIENTÔT').sort((a, b) => a.finGarantie < b.finGarantie ? -1 : 1);
   if (gs.length) {
     h += `<div class="sec"><h2>Garanties qui expirent</h2><span class="lnk">sous 3 mois</span></div><div class="list">` +
-      gs.map(b => `<div class="item tap" data-act="bien" data-id="${b.id}"><div class="grow"><div class="ttl">${esc(b.objet)}</div><div class="meta">${pieceTag(b.piece)}<span>${esc(b.marque || '')}</span></div></div><div class="when"><b>${fr(b.finGarantie)}</b>${gStamp(b.statut)}</div></div>`).join('') + '</div>';
+      gs.map(b => `<div class="item tap" data-act="bien" data-id="${esc(b.id)}"><div class="grow"><div class="ttl">${esc(b.objet)}</div><div class="meta">${pieceTag(b.piece)}<span>${esc(b.marque || '')}</span></div></div><div class="when"><b>${fr(b.finGarantie)}</b>${gStamp(b.statut)}</div></div>`).join('') + '</div>';
   }
   // zones
   const zones = [...new Set(E.map(t => t.zone))];
@@ -660,7 +688,7 @@ function vBord() {
   }).join('') + '</div>';
   // contacts
   h += `<div class="sec"><h2>Contacts</h2><button class="lnk" data-act="contact-new">+ Ajouter</button></div><div class="list">` +
-    (S.d.contacts.length ? S.d.contacts.map(c => `<div class="item"><div class="grow tap" data-act="contact" data-id="${c.id}"><div class="ttl">${esc(c.nom || c.pourquoi)}</div><div class="desc">${esc(c.pourquoi)}${c.notes ? ' · ' + esc(c.notes) : ''}</div></div>
+    (S.d.contacts.length ? S.d.contacts.map(c => `<div class="item"><div class="grow tap" data-act="contact" data-id="${esc(c.id)}"><div class="ttl">${esc(c.nom || c.pourquoi)}</div><div class="desc">${esc(c.pourquoi)}${c.notes ? ' · ' + esc(c.notes) : ''}</div></div>
       ${c.tel ? `<a class="mini" href="tel:${esc(c.tel.replace(/\s/g, ''))}">${ICON.phone}</a>` : ''}${c.mail ? `<a class="mini" href="mailto:${esc(c.mail)}">${ICON.mail}</a>` : ''}</div>`).join('') : '<div class="empty">Aucun contact</div>') + '</div>';
   h += `<div class="foot">Fichier synchronisé · ${S.d.maj ? new Date(S.d.maj).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : ''}</div>`;
   return h;
@@ -716,8 +744,8 @@ function vHisto() {
       const d = dOf(x.date), nb = L.filter(z => z.date.slice(0, 7) === m).length;
       h += `<div class="month"><span>${MOIS[d.getMonth()]} ${d.getFullYear()}</span><span>${nb} passage${nb > 1 ? 's' : ''}</span></div><div class="list">`; mois = m;
     }
-    h += `<div class="item tap ${x.pending ? 'pending' : ''}" data-act="passage" data-id="${x.id}"><div class="mono" style="font-size:13px;font-weight:600;width:44px">${frCourt(x.date)}</div>
-      <div class="grow"><div class="ttl">${esc(x.element)}</div><div class="meta">${zoneTag(zoneDe(x.element) || x.zone)}${x.duree ? `<span class="mono">${x.duree} min</span>` : ''}${x.pending ? '<span>envoi…</span>' : ''}</div></div></div>`;
+    h += `<div class="item tap ${x.pending ? 'pending' : ''}" data-act="passage" data-id="${esc(x.id)}"><div class="mono" style="font-size:13px;font-weight:600;width:44px">${frCourt(x.date)}</div>
+      <div class="grow"><div class="ttl">${esc(x.element)}</div><div class="meta">${zoneTag(zoneDe(x.element) || x.zone)}${x.duree ? `<span class="mono">${esc(x.duree)} min</span>` : ''}${x.pending ? '<span>envoi…</span>' : ''}</div></div></div>`;
   });
   return h + '</div>';
 }
@@ -731,7 +759,7 @@ function vInventaire() {
     <div class="gauge"><i style="width:${Math.min(pct, 100)}%;background:${pct >= 95 ? 'var(--red)' : pct >= 90 ? 'var(--ora)' : 'var(--yel)'}"></i></div><div class="sub">${I.length} biens · ${pct} % du plafond MAIF · hors travaux</div></div>`;
   if (pct >= 95) h += `<div class="alerte rouge"><span>⚠️</span><span><b>Plafond MAIF presque atteint</b><br>Au-delà de ${e0(pf)}, la différence n'est pas remboursée en cas de sinistre : demande un relèvement du capital mobilier.</span></div>`;
   const fin30 = I.filter(b => b.finGarantie && b.finGarantie >= today() && b.finGarantie <= addDays(today(), 30)).sort((a, b) => a.finGarantie < b.finGarantie ? -1 : 1);
-  fin30.forEach(b => h += `<button class="alerte" data-act="bien" data-id="${b.id}"><span>🛡</span><span><b>Garantie : fin le ${fr(b.finGarantie)}</b> (dans ${diffJ(b.finGarantie, today())} j)<br>${esc(b.objet)} · teste-le à fond avant la fin, un défaut constaté avant est pris en charge.</span></button>`);
+  fin30.forEach(b => h += `<button class="alerte" data-act="bien" data-id="${esc(b.id)}"><span>🛡</span><span><b>Garantie : fin le ${fr(b.finGarantie)}</b> (dans ${diffJ(b.finGarantie, today())} j)<br>${esc(b.objet)} · teste-le à fond avant la fin, un défaut constaté avant est pris en charge.</span></button>`);
   h += `<button class="expbtn" data-act="export"><span class="ic">📄</span><span><b>Dossier pour l'assurance</b><small>PDF ou Word · fiches, photos et factures</small></span><span class="chev">›</span></button>`;
   const J = S.d.jeux || [];
   if (J.length) h += `<button class="expbtn" data-act="ludo"><span class="ic">🎲</span><span><b>Ludothèque</b><small>${J.filter(j => j.assure).length} jeux et extensions assurés · ${e0(valeurLudo())}</small></span><span class="chev">›</span></button>`;
@@ -756,9 +784,9 @@ function listeBiens() {
   const L = biensFiltres();
   setTimeout(() => { const c = $('#icount'); if (c) c.textContent = L.length + ' bien' + (L.length > 1 ? 's' : '') + ' · ' + e0(L.filter(b => b.categorie !== 'Travaux').reduce((s, b) => s + (Number(b.prix) || 0), 0)); });
   if (!L.length) return '<div class="empty">Aucun bien ne correspond</div>';
-  return L.map(b => `<div class="item tap ${b.pending ? 'pending' : ''}" data-act="bien" data-id="${b.id}">
+  return L.map(b => `<div class="item tap ${b.pending ? 'pending' : ''}" data-act="bien" data-id="${esc(b.id)}">
     <div class="grow"><div class="ttl">${esc(b.objet)}</div>${b.marque ? `<div class="desc">${esc(b.marque)}</div>` : ''}
-    <div class="meta">${pieceTag(b.piece)}${b.maif ? '<span class="badge maif">MAIF</span>' : ''}${b.garantie > 2 ? `<span class="badge star">★ ${b.garantie} ans</span>` : ''}${b.statut && b.statut !== 'COUVERTE' ? gStamp(b.statut) : ''}
+    <div class="meta">${pieceTag(b.piece)}${b.maif ? '<span class="badge maif">MAIF</span>' : ''}${b.garantie > 2 ? `<span class="badge star">★ ${esc(b.garantie)} ans</span>` : ''}${b.statut && b.statut !== 'COUVERTE' ? gStamp(b.statut) : ''}
     ${b.facture ? '<span class="badge">📄 facture</span>' : ''}${b.photo ? `<span class="badge">${esc(b.photoLabel || '📷 photo')}</span>` : '<span class="badge warn">sans photo</span>'}</div></div>
     <div class="when"><b>${b.prix ? e2(b.prix) : '<span class="badge warn">prix ?</span>'}</b>${b.date ? frCourt(b.date) + '/' + b.date.slice(2, 4) : ''}</div></div>`).join('');
 }
@@ -779,7 +807,7 @@ function ouvrirTache(el) {
     <div>Outillage</div><div>${esc(t.outils || '—')}</div></div>
     <button class="go" data-act="fait" data-el="${esc(t.element)}">✓ C'est fait</button>
     <div class="lbl">Derniers passages</div>
-    <div class="list">${H.length ? H.map(h => `<div class="item tap" data-act="passage" data-id="${h.id}"><span class="mono" style="font-weight:600">${fr(h.date)}</span><span class="grow"></span><span class="mono muted">${h.duree ? h.duree + ' min' : ''}</span></div>`).join('') : '<div class="empty">Jamais fait</div>'}</div>`);
+    <div class="list">${H.length ? H.map(h => `<div class="item tap" data-act="passage" data-id="${esc(h.id)}"><span class="mono" style="font-weight:600">${fr(h.date)}</span><span class="grow"></span><span class="mono muted">${h.duree ? esc(h.duree) + ' min' : ''}</span></div>`).join('') : '<div class="empty">Jamais fait</div>'}</div>`);
 }
 
 /* ---------- saisie d'un passage ---------- */
@@ -795,8 +823,8 @@ function rendreFait() {
   const durees = [5, 10, 15, 20, 30, 45, 60, 90];
   ouvrir(tete(f.mode === 'maj' ? 'Modifier le passage' : 'Noter le passage', `<b>${esc(t.element)}</b> · ${esc(t.intervention)}`) + `
     <div class="lbl">Quand ?</div>
-    <div class="chips wrap">${jours.map(([d, l]) => `<button class="chip ${f.date === d ? 'on' : ''}" data-act="f-date" data-d="${d}">${l}</button>`).join('')}
-      <label class="chip ${autre ? 'on' : ''}" style="position:relative">📅 ${autre ? fr(f.date) : 'Autre date'}<input type="date" id="fdate" max="${today()}" value="${f.date}" style="position:absolute;inset:0;opacity:0"></label></div>
+    <div class="chips wrap">${jours.map(([d, l]) => `<button class="chip ${f.date === d ? 'on' : ''}" data-act="f-date" data-d="${esc(d)}">${l}</button>`).join('')}
+      <label class="chip ${autre ? 'on' : ''}" style="position:relative">📅 ${autre ? fr(f.date) : 'Autre date'}<input type="date" id="fdate" max="${today()}" value="${esc(f.date)}" style="position:absolute;inset:0;opacity:0"></label></div>
     <div class="lbl">Durée <span style="text-transform:none;letter-spacing:0">(facultatif)</span></div>
     <div class="chips wrap"><button class="chip ${!f.duree ? 'on' : ''}" data-act="f-duree" data-v="">—</button>${durees.map(d => `<button class="chip ${+f.duree === d ? 'on' : ''}" data-act="f-duree" data-v="${d}">${d} min</button>`).join('')}</div>
     ${f.mode === 'fait' && t.freq ? `<div class="note">Prochain passage calculé : <b class="mono">${fr(plusFreq(f.date, t.freq))}</b> (${esc(t.freqTxt || freqTxt(t.freq))})</div>` : ''}
@@ -848,7 +876,7 @@ function ouvrirBien(id) {
   S.form = { mode: 'bien', id };
   ouvrir(tete(esc(b.objet), esc(b.marque || '')) + `
     ${galerieHtml(b)}
-    <div class="rowline" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">${pieceTag(b.piece)}<span class="badge">${esc(b.categorie || '—')}</span>${b.garantie > 2 ? `<span class="badge star">★ ${b.garantie} ans</span>` : ''}${gStamp(b.statut)}</div>
+    <div class="rowline" style="gap:6px;flex-wrap:wrap;margin-bottom:12px">${pieceTag(b.piece)}<span class="badge">${esc(b.categorie || '—')}</span>${b.garantie > 2 ? `<span class="badge star">★ ${esc(b.garantie)} ans</span>` : ''}${gStamp(b.statut)}</div>
     <div class="kv">
       <div>Prix TTC</div><div class="mono"><b>${b.prix ? e2(b.prix) : '—'}</b>${b.prixAuto ? ' <span class="badge">calculé</span>' : ''}</div>
       <div>Acheté le</div><div class="mono">${fr(b.date)}</div>
@@ -859,8 +887,8 @@ function ouvrirBien(id) {
     ${b.remarque ? `<div class="note">${esc(b.remarque)}</div>` : ''}
     ${estLotJeux(b) && (S.d.jeux || []).length ? `<button class="go sec2" data-act="ludo">🎲 Voir la ludothèque (${S.d.jeux.filter(j => j.assure).length})</button>` : ''}
     <div class="btnrow">
-      ${b.facture ? `<a class="go sec2" href="${esc(b.facture)}" target="_blank" rel="noopener">${esc(b.factureLabel || '📄 Facture')}</a>` : `<span class="go sec2" style="opacity:.45">Pas de facture</span>`}
-      ${b.photo ? `<a class="go sec2" href="${esc(b.photo)}" target="_blank" rel="noopener">${esc(b.photoLabel || '📁 Photos')}</a>` : `<span class="go sec2" style="opacity:.45">Aucune photo</span>`}
+      ${b.facture ? `<a class="go sec2" href="${hrefSur(b.facture)}" target="_blank" rel="noopener">${esc(b.factureLabel || '📄 Facture')}</a>` : `<span class="go sec2" style="opacity:.45">Pas de facture</span>`}
+      ${b.photo ? `<a class="go sec2" href="${hrefSur(b.photo)}" target="_blank" rel="noopener">${esc(b.photoLabel || '📁 Photos')}</a>` : `<span class="go sec2" style="opacity:.45">Aucune photo</span>`}
     </div>
     <button class="go ${b.maif ? 'maifon' : 'sec2'}" data-act="maif" ${b.row ? '' : 'disabled'}>${b.maif ? '✓ Dans le dossier MAIF (retirer)' : '🛡 Ajouter au dossier MAIF'}</button>
     <div id="photoBox"></div>
@@ -879,8 +907,8 @@ function galerieHtml(b) {
   if (g.err) return `<div class="galerie-msg" id="galerie">${esc(g.err)}</div>`;
   if (!g.photos.length) return '';
   const reste = g.total - g.photos.length, n = g.photos.length + (reste > 0 ? 1 : 0);
-  return `<div class="galerie ${n === 1 ? 'un' : ''}" id="galerie">` + g.photos.map(p => `<a href="${esc(p.url)}" target="_blank" rel="noopener" title="${esc(p.nom)}"><img src="${p.src}" alt="${esc(p.nom)}" loading="lazy"></a>`).join('')
-    + (reste > 0 ? `<a class="gplus" href="${esc(b.photo)}" target="_blank" rel="noopener">+${reste}</a>` : '') + '</div>';
+  return `<div class="galerie ${n === 1 ? 'un' : ''}" id="galerie">` + g.photos.map(p => `<a href="${hrefSur(p.url)}" target="_blank" rel="noopener" title="${esc(p.nom)}"><img src="${srcSur(p.src)}" alt="${esc(p.nom)}" loading="lazy"></a>`).join('')
+    + (reste > 0 ? `<a class="gplus" href="${hrefSur(b.photo)}" target="_blank" rel="noopener">+${reste}</a>` : '') + '</div>';
 }
 async function chargerGalerie(b) {
   if (!b.photo || !b.row || S.galKO) return;
@@ -968,7 +996,7 @@ function listeJeux() {
   const L = (S.d.jeux || []).filter(j => (!q || norm([j.titre, j.editeur, j.type].join(' ')).includes(q))
     && (!f || (f === 'Jeu' ? j.type !== 'Extension' && j.type !== 'Accessoire' : f === 'prix' ? !j.valeur : f === 'non' ? !j.assure : j.type === f)));
   if (!L.length) return '<div class="empty">Aucun jeu ne correspond</div>';
-  return L.map(j => `<div class="item tap ${j.pending ? 'pending' : ''}" data-act="jeu" data-row="${j.row}" ${j.assure ? '' : 'style="opacity:.5"'}>
+  return L.map(j => `<div class="item tap ${j.pending ? 'pending' : ''}" data-act="jeu" data-row="${esc(j.row)}" ${j.assure ? '' : 'style="opacity:.5"'}>
     <div class="grow"><div class="ttl">${esc(j.titre)}</div><div class="desc">${esc(j.editeur || '')}</div>
     <div class="meta"><span class="badge">${esc(j.type)}</span>${j.sleeve ? '<span class="badge">sleevé</span>' : ''}${j.insert ? '<span class="badge">insert</span>' : ''}${j.proprio ? `<span class="badge warn">à ${esc(j.proprio)}</span>` : ''}${!j.assure ? '<span class="badge warn">non assuré</span>' : ''}</div></div>
     <div class="when"><b>${j.valeur ? e2(j.valeur) : '<span class="badge warn">prix ?</span>'}</b>${j.date ? frCourt(j.date) + '/' + j.date.slice(2, 4) : ''}</div></div>`).join('');
@@ -1113,15 +1141,15 @@ function rendreExport() {
   }
   if (f.charge) h += `<div class="empty">Vérification des exports…</div>`;
   if (enCours) h += `<div class="prog"><div class="lab">Export en cours${st.pieces && st.pieces.length ? ' · ' + esc(st.pieces.join(', ')) : ''}</div><div class="et">${esc(st.etape || '…')}</div>
-    <div class="gauge run"><i style="width:${Math.max(4, st.pct || 0)}%"></i></div><div class="sub">${st.pct || 0} % · tu peux fermer l'appli, le mail suivra</div>
+    <div class="gauge run"><i style="width:${Math.max(4, +st.pct || 0)}%"></i></div><div class="sub">${+st.pct || 0} % · tu peux fermer l'appli, le mail suivra</div>
     <button class="stop ${f.stop ? 'conf' : ''}" data-act="x-stop" ${f.arret ? 'disabled' : ''}>${f.arret ? 'Annulation…' : f.stop ? 'Touche encore pour confirmer' : '✕ Annuler l\'export'}</button></div>`;
-  if (st && st.etat === 'termine') h += `<div class="okbox"><h4>✓ ${st.ludo ? 'Ludothèque prête' : 'Dossier prêt'}</h4><div style="font-size:13.5px">${st.ludo ? st.nbJeux + ' jeux · ' + e0(st.valeurJeux) + ' · ' + ago(st.fin) + '</div>' : `${st.nbBiens} biens · ${st.nbAnnexes}${st.nbAnnexesPrevues ? '/' + st.nbAnnexesPrevues : ''} factures en annexe${st.pagesAnnexes ? ' (' + st.pagesAnnexes + ' p.)' : ''} · ${ago(st.fin)}</div>`}
+  if (st && st.etat === 'termine') h += `<div class="okbox"><h4>✓ ${st.ludo ? 'Ludothèque prête' : 'Dossier prêt'}</h4><div style="font-size:13.5px">${st.ludo ? esc(st.nbJeux) + ' jeux · ' + e0(st.valeurJeux) + ' · ' + ago(st.fin) + '</div>' : `${esc(st.nbBiens)} biens · ${esc(st.nbAnnexes)}${st.nbAnnexesPrevues ? '/' + st.nbAnnexesPrevues : ''} factures en annexe${st.pagesAnnexes ? ' (' + st.pagesAnnexes + ' p.)' : ''} · ${ago(st.fin)}</div>`}
     ${(st.avertissements || []).length ? `<ul class="warnlist">${st.avertissements.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}</div>
-    <a class="go" href="${esc(st.pdf)}" target="_blank" rel="noopener">Ouvrir le PDF</a>
-    <div class="btnrow">${st.docx ? `<a class="go sec2" href="${esc(st.docx)}" target="_blank" rel="noopener">Version Word</a>` : ''}<a class="go sec2" href="${esc(st.dossier)}" target="_blank" rel="noopener">Dossier Drive</a></div>`;
+    <a class="go" href="${hrefSur(st.pdf)}" target="_blank" rel="noopener">Ouvrir le PDF</a>
+    <div class="btnrow">${st.docx ? `<a class="go sec2" href="${hrefSur(st.docx)}" target="_blank" rel="noopener">Version Word</a>` : ''}<a class="go sec2" href="${hrefSur(st.dossier)}" target="_blank" rel="noopener">Dossier Drive</a></div>`;
   else if (st && st.etat === 'annule') h += `<div class="note">Export annulé${st.fin ? ' ' + ago(st.fin) : ''}. Tu peux en relancer un.</div>`;
   else if (st && st.etat === 'erreur') h += `<div class="errbox"><b>L'export a échoué</b><br>${esc(st.message || '')}</div>`;
-  if (f.dernier && !(st && st.etat === 'termine')) h += `<div class="lbl">Dernier dossier</div><div class="list"><a class="item tap" href="${esc(f.dernier.pdf)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="grow"><div class="ttl">${esc(f.dernier.ludo ? 'Ludothèque' : (f.dernier.pieces || []).length ? f.dernier.pieces.join(', ') : 'Inventaire complet')}</div><div class="desc">${f.dernier.ludo ? f.dernier.nbJeux + ' jeux · ' + e0(f.dernier.valeurJeux) : f.dernier.nbBiens + ' biens · ' + f.dernier.nbAnnexes + ' factures'} · ${ago(f.dernier.fin)}</div></div><span class="badge">PDF ›</span></a></div>`;
+  if (f.dernier && !(st && st.etat === 'termine')) h += `<div class="lbl">Dernier dossier</div><div class="list"><a class="item tap" href="${hrefSur(f.dernier.pdf)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="grow"><div class="ttl">${esc(f.dernier.ludo ? 'Ludothèque' : (f.dernier.pieces || []).length ? f.dernier.pieces.join(', ') : 'Inventaire complet')}</div><div class="desc">${f.dernier.ludo ? f.dernier.nbJeux + ' jeux · ' + e0(f.dernier.valeurJeux) : f.dernier.nbBiens + ' biens · ' + f.dernier.nbAnnexes + ' factures'} · ${ago(f.dernier.fin)}</div></div><span class="badge">PDF ›</span></a></div>`;
   $('#sheetIn').innerHTML = h;
 }
 // 1.8.4 : l'appli lance elle-même la passe d'export suivante (sans attendre le déclencheur Google, 1 à 2 min) ; on n'attend pas la réponse
@@ -1385,13 +1413,13 @@ function ouvrirTrophees() {
   const film = M.map(({ m, s }) => {
     const nm = MOIS[+m.slice(5, 7) - 1].slice(0, 4).replace(/\.$/, '');
     if (!s) return `<div class="frame vide"><span class="m">${nm}</span><span class="s">·</span></div>`;
-    if (!s.fini) return `<div class="frame cours"><span class="m">${nm}</span><span class="s">${s.pct}%</span></div>`;
-    return `<div class="frame ${s.parfait ? 'ok' : 'ko'}"><span class="m">${nm}</span><span class="s">${s.parfait ? '★' : s.pct + '%'}</span></div>`;
+    if (!s.fini) return `<div class="frame cours"><span class="m">${nm}</span><span class="s">${+s.pct || 0}%</span></div>`;
+    return `<div class="frame ${s.parfait ? 'ok' : 'ko'}"><span class="m">${nm}</span><span class="s">${s.parfait ? '★' : (+s.pct || 0) + "%"}</span></div>`;
   }).join('');
   const vacs = j.vacances.filter(v => v.fin >= auj).sort((a, b) => a.debut < b.debut ? -1 : 1);
   const ticket = t => {
     const [a, b] = t.prog, p = Math.max(0, Math.min(100, Math.round(100 * a / b)));
-    return `<div class="ticket ${t.ok ? 'ok' : 'lock'}" data-act="trophee" data-id="${t.id}"><span class="adm">${t.ok ? 'GAGNÉ' : 'N° ' + String(T.indexOf(t) + 1).padStart(2, '0')}</span><div class="ic">${t.ic}</div>
+    return `<div class="ticket ${t.ok ? 'ok' : 'lock'}" data-act="trophee" data-id="${esc(t.id)}"><span class="adm">${t.ok ? 'GAGNÉ' : 'N° ' + String(T.indexOf(t) + 1).padStart(2, '0')}</span><div class="ic">${t.ic}</div>
       <div class="n">${esc(t.nom)}</div><div class="d">${esc(t.desc)}</div>
       ${t.ok ? '' : `<div class="gauge"><i style="width:${p}%"></i></div>`}
       <div class="r">${t.theme ? '🎨 thème ' + esc(t.theme.nom) : '🐟 ' + esc(t.poisson[0])}${t.ok ? '' : ' · ' + Math.min(a, b) + '/' + b}</div></div>`;
@@ -1412,7 +1440,7 @@ function ouvrirTrophees() {
     <div class="tickets">${T.filter(t => t.ok).concat(T.filter(t => !t.ok)).map(ticket).join('')}</div>
     <div class="lbl" style="margin-top:16px">🏖 Mode vacances</div>
     <p class="muted" style="font-size:12.5px;margin:0 2px 6px">Pendant tes absences, la série est en pause (elle ne casse pas) et le mail de rappel d'entretien ne part pas.</p>
-    ${vacs.map(v => `<div class="vacline"><span>${v.debut <= auj ? '<b>En cours</b> · ' : ''}du <span class="mono">${fr(v.debut)}</span> au <span class="mono">${fr(v.fin)}</span></span><button class="mini" data-act="vac-del" data-d="${v.debut}">${v.debut <= auj ? 'Je suis rentré' : 'Retirer'}</button></div>`).join('')}
+    ${vacs.map(v => `<div class="vacline"><span>${v.debut <= auj ? '<b>En cours</b> · ' : ''}du <span class="mono">${fr(v.debut)}</span> au <span class="mono">${fr(v.fin)}</span></span><button class="mini" data-act="vac-del" data-d="${esc(v.debut)}">${v.debut <= auj ? 'Je suis rentré' : 'Retirer'}</button></div>`).join('')}
     <div class="grid2" style="margin-top:8px"><div><div class="lbl">Départ</div><input class="field mono" type="date" id="vac-d" value="${auj}"></div><div><div class="lbl">Retour</div><input class="field mono" type="date" id="vac-f" value="${addDays(auj, 7)}"></div></div>
     <div class="err" id="vac-err"></div>
     <button class="go sec2" data-act="vac-add">🏖 Ajouter ces vacances</button>`);
@@ -1439,9 +1467,9 @@ function ouvrirConso() {
   const C = conso(), R = C.filter(c => c.racheter), L = S.cf === 'rach' ? R : C;
   ouvrir(tete('🧴 Consommables', `${R.length} à racheter · ${C.length} article${C.length > 1 ? 's' : ''}`) + `
     <div class="chips"><button class="chip ${S.cf !== 'rach' ? 'on' : ''}" data-act="cfiltre" data-f="">Tous<small>${C.length}</small></button><button class="chip ${S.cf === 'rach' ? 'on' : ''}" data-act="cfiltre" data-f="rach">🛒 À racheter<small>${R.length}</small></button></div>
-    <div class="list conso">${L.length ? L.map(c => `<div class="item ${c.pending ? 'pending' : ''}"><div class="grow tap" data-act="conso-item" data-id="${c.id}"><div class="ttl">${esc(c.article)}</div>
+    <div class="list conso">${L.length ? L.map(c => `<div class="item ${c.pending ? 'pending' : ''}"><div class="grow tap" data-act="conso-item" data-id="${esc(c.id)}"><div class="ttl">${esc(c.article)}</div>
       <div class="desc">${esc(c.pour || '—')}${c.prix ? ' · <span class="mono">' + e2(c.prix) + '</span>' : ''}${c.remarque ? ' · ' + esc(c.remarque) : ''}</div></div>
-      ${c.lien ? `<a class="mini" href="${esc(c.lien)}" target="_blank" rel="noopener">Acheter</a>` : ''}<button class="mini ${c.racheter ? 'on' : ''}" data-act="conso-rach" data-id="${c.id}" aria-label="À racheter">🛒</button></div>`).join('')
+      ${c.lien ? `<a class="mini" href="${hrefSur(c.lien)}" target="_blank" rel="noopener">Acheter</a>` : ''}<button class="mini ${c.racheter ? 'on' : ''}" data-act="conso-rach" data-id="${esc(c.id)}" aria-label="À racheter">🛒</button></div>`).join('')
       : `<div class="empty">${S.cf === 'rach' ? 'Rien à racheter 👌' : 'Aucun consommable'}</div>`}</div>
     <button class="go" data-act="conso-new">${ICON.plus} Ajouter un consommable</button>
     <p class="muted" style="font-size:12px;margin:8px 2px 0">🛒 = à racheter. La liste est aussi dans l'onglet « 🧴 Consommables » du fichier.</p>`);
@@ -1638,7 +1666,7 @@ function carteAffiche() {
   const it = L[S.affI], n = L.length;
   const etiquette = { retard: 'EN RETARD', bientot: 'BIENTÔT', ok: 'À FAIRE', 'plus-tard': 'PROCHAINEMENT', relache: 'RELÂCHE' }[it.niv];
   const bouton = it.act === 'fait' ? `<button class="fait" data-act="fait" data-el="${esc(it.el)}">${ICON.check}FAIT</button>`
-    : it.act === 'bien' ? `<button class="mini" data-act="bien" data-id="${it.id}">${it.bouton}</button>`
+    : it.act === 'bien' ? `<button class="mini" data-act="bien" data-id="${esc(it.id)}">${it.bouton}</button>`
     : it.act ? `<button class="mini" data-act="${it.act}" data-p="${esc(it.piece || '')}">${it.bouton}</button>` : '';
   return `<div class="affiche ${it.niv}" id="affiche">
     <div class="marquee"><span>★ À L'AFFICHE ★</span>${n > 1 ? `<span class="nav"><button data-act="aff-prev" aria-label="Précédent">‹</button><b>${S.affI + 1}/${n}</b><button data-act="aff-next" aria-label="Suivant">›</button></span>` : ''}</div>
@@ -1715,6 +1743,11 @@ function ouvrirAide(depuis) {   // 1.8.7 : mode d'emploi complet (avant : seulem
     ['📶 Hors connexion', 'Tout se note même sans réseau (cave, salle de bain). Le point en haut indique l\'envoi en cours ; les saisies partent seules au retour du réseau, sans doublon ni perte.'],
     ['⚙️ Réglages', 'L\'état du mail, le nombre de saisies en attente, la version de l\'appli, et le bouton pour actualiser.']
   ]);
+  h += bloc('Partage et autres carnets', [
+    ['📤 Partager', 'Réglages › « Partager le lien de ce carnet » : envoie le lien par message, et la clé d\'accès dans un autre message. Le lien ouvre le carnet sur l\'autre téléphone, la clé le déverrouille.'],
+    ['🔗 Lien reçu', 'Ouvre le lien reçu : l\'appli demande « Ouvrir ce carnet ? », puis sa clé. Sur iPhone, si l\'appli installée ne le reconnaît pas, touche « J\'ai reçu un lien de carnet » et colle le lien.'],
+    ['📒 Plusieurs carnets', 'Chaque carnet garde ses propres données et ses saisies en attente : rien ne passe d\'un carnet à l\'autre. Les carnets déjà ouverts sur le téléphone sont dans Réglages, pour passer de l\'un à l\'autre.']
+  ]);
   h += bloc('Le jeu', [
     ['🎬 À l\'affiche', 'En haut de l\'accueil : la chose la plus urgente à faire, avec la scène de sa zone. En retard, le décor se dégrade ; ‹ › pour voir les suivantes. Quand tout est à jour : relâche, la salle ciné est à toi.'],
     ['🐟 Aquarium', 'Un poisson par trophée gagné. L\'eau se trouble quand des tâches sont en retard. Le filtre fait des bulles, sauf si l\'entretien de l\'aquarium est en retard.'],
@@ -1744,58 +1777,89 @@ function ouvrirReglages() {
     <button class="go sec2" data-act="aide-r">❓ Comment ça marche</button>
     <button class="go sec2" data-act="mailtest">Envoyer un mail de test</button>
     <div class="btnrow"><button class="go sec2" data-act="refresh">↻ Actualiser</button>${sheetUrl() ? `<a class="go sec2" href="${esc(sheetUrl())}" target="_blank" rel="noopener">Ouvrir le Sheet</a>` : ''}</div>
-    <div class="lbl">Ce carnet sur un autre téléphone</div>
-    <button class="go sec2" data-act="partager">📤 Partager le lien de ce carnet</button>
-    <p class="muted" style="font-size:12.5px;font-style:italic;margin:4px 2px 10px">Le lien ouvre ce carnet ; la clé d'accès reste nécessaire (ne l'envoie pas dans le même message).</p>
-    <button class="go sec2" data-act="autre-carnet">🔁 Ouvrir un autre carnet</button>
-    ${DEFAUT ? '' : '<button class="go sec2" data-act="carnet-def">‹ Revenir au carnet principal</button>'}
+    <div class="lbl">Partage et autres carnets</div>
+    <div class="list">
+      <div class="item tap" data-act="partager"><span>📤</span><div class="grow"><div class="ttl">Partager le lien de ce carnet</div><div class="desc">Pour l'ouvrir sur un autre téléphone. Envoie la clé dans un autre message.</div></div></div>
+      ${autresCarnets().map(c => `<div class="item tap" data-act="aller-carnet" data-id="${esc(c.id)}"><span>📒</span><div class="grow"><div class="ttl">Aller au carnet « ${esc(c.nom)} »</div><div class="desc">Déjà ouvert sur ce téléphone</div></div></div>`).join('')}
+      <div class="item tap" data-act="autre-carnet"><span>🔗</span><div class="grow"><div class="ttl">J'ai reçu un lien de carnet</div><div class="desc">Ouvrir le carnet de quelqu'un d'autre (avec sa clé)</div></div></div>
+    </div>
     <button class="go danger" data-act="logout">Changer de clé d'accès</button>`);
 }
 
 function nomCarnet() {   // 1.9 : le script peut donner un nom (serveur.nom) ; sinon « Carnet · T3 » pour le carnet principal
-  const n = S.d && S.d.serveur && S.d.serveur.nom;
-  return n ? String(n).slice(0, 30) : DEFAUT ? 'Carnet · T3' : 'Mon carnet';
+  const n = (S.d && S.d.serveur && S.d.serveur.nom) || (connus()[idDe(URL_CARNET)] || {}).nom;
+  return n ? String(n).slice(0, 30) : DEFAUT ? 'Carnet · T3' : 'Autre carnet';
+}
+function retenirCarnet() {   // 1.9 : carnets ouverts avec succès sur ce téléphone (nom affiché, pas de question au prochain lien)
+  const c = connus(), id = idDe(URL_CARNET), n = S.d && S.d.serveur && S.d.serveur.nom;
+  c[id] = { nom: n ? String(n).slice(0, 30) : (c[id] || {}).nom || (DEFAUT ? 'Carnet · T3' : '') };
+  LS.set('connus', c);
+}
+function autresCarnets() {   // carnets déjà ouverts sur ce téléphone, sauf celui-ci
+  const c = connus(), ici = idDe(URL_CARNET);
+  if (!c[idDe(API_URL)] && clesSurTel().includes('carnet.key')) c[idDe(API_URL)] = { nom: 'Carnet · T3' };
+  return Object.keys(c).filter(id => id !== ici && ID_OK.test(id)).map(id => ({ id, nom: c[id].nom || 'Carnet sans nom' }));
+}
+function proposerCarnet() {   // 1.9 (carnet-code) : « Ouvrir ce carnet ? » à l'arrivée d'un lien inconnu
+  const id = CARNET_PROPOSE; if (!id) return;
+  const l = $('#lock'), avant = l.hidden; l.hidden = false;
+  l.innerHTML = `<div class="in"><img src="icon-192.png" alt=""><h1>Ouvrir ce carnet ?</h1>
+    <p class="muted" style="margin:6px 0 18px">Tu as ouvert le lien d'un autre carnet d'entretien. Il s'ouvrira avec sa propre clé ; ton carnet actuel (« ${esc(nomCarnet())} ») et ses données restent intacts sur ce téléphone.</p>
+    <button class="go" id="pok">Ouvrir ce carnet</button>
+    <button class="go sec2" id="pnon" style="margin-top:8px">Non, rester sur « ${esc(nomCarnet())} »</button></div>`;
+  $('#pok').addEventListener('click', () => { const c = connus(); c[id] = c[id] || { nom: '' }; LS.set('connus', c); changerCarnet(urlDe(id)); });
+  $('#pnon').addEventListener('click', () => { CARNET_PROPOSE = ''; if (!S.key) verrouiller(); else { l.hidden = true; if (avant === false) verrouiller(); } });
 }
 function partagerLien() {   // 1.9 : partage du lien d'installation (SMS, WhatsApp, mail…) ; copie si le partage n'existe pas
   const url = lienCarnet(), titre = 'Mon carnet d\'entretien';
-  if (navigator.share) { navigator.share({ title: titre, text: 'Ouvre ce lien sur ton téléphone pour installer le carnet :', url }).catch(() => {}); return; }
+  if (navigator.share) { navigator.share({ title: titre, text: 'Ouvre ce lien sur ton téléphone pour installer le carnet (je t\'envoie la clé à part) :', url }).catch(() => {}); return; }
   const fini = () => toast('🔗 Lien copié : colle-le dans un message');
   if (navigator.clipboard) navigator.clipboard.writeText(url).then(fini, () => prompt('Copie ce lien :', url)); else prompt('Copie ce lien :', url);
 }
 
 /* ================= VERROU ================= */
-function verrouiller(msg) {
+function verrouiller(msg, annulable) {
+  /* 1.9 (carnet-utilisateur) : écran neutre. Sur iPhone, l'appli installée oublie le lien : Carla peut tomber sur le carnet
+     principal ; elle doit comprendre tout de suite que ce n'est pas le sien et trouver « J'ai reçu un lien de carnet ». */
   const l = $('#lock'); l.hidden = false;
-  l.innerHTML = `<div class="in"><img src="icon-192.png" alt=""><h1>${DEFAUT ? 'Carnet · T3' : 'Carnet d\'entretien'}</h1>
-    <p class="muted" style="margin:0 0 18px;font-style:italic">${DEFAUT ? 'Entretien & inventaire de l\'appartement' : 'Ton carnet · lien reçu, il ne reste que la clé'}</p>
+  const peutAnnuler = annulable && S.key && S.d;
+  const retourT3 = !DEFAUT && clesSurTel().includes('carnet.key');   // seulement si le carnet T3 a déjà été ouvert ici
+  const aide = 'Pas ton carnet ? Touche « J\'ai reçu un lien de carnet » et colle le lien reçu par message.';
+  l.innerHTML = `<div class="in"><img src="icon-192.png" alt=""><h1>${DEFAUT ? 'Carnet d\'entretien' : esc(nomCarnet())}</h1>
+    <p class="muted" style="margin:0 0 18px;font-style:italic">${DEFAUT ? 'Tape la clé d\'accès de ton carnet' : 'Carnet ouvert par lien · il ne reste que sa clé'}</p>
     <input class="field" id="kin" type="password" placeholder="Clé d'accès" autocomplete="current-password">
     <div class="err" id="kerr">${msg ? esc(msg) : ''}</div>
+    <p class="muted" id="kaide" style="font-size:13px;margin:4px 0 0" ${msg && DEFAUT ? '' : 'hidden'}>${aide}</p>
     <button class="go" id="kgo">Ouvrir le carnet</button>
-    <button class="go sec2" id="klien" style="margin-top:14px">🔗 J'ai un lien vers mon carnet</button>
-    <div id="kzone" hidden><input class="field" id="kurl" placeholder="Colle ici le lien de ton carnet" autocomplete="off"><button class="go sec2" id="kok">Utiliser ce lien</button></div>
-    ${DEFAUT ? '' : '<button class="go sec2" id="kdef" style="margin-top:6px">‹ Revenir au carnet principal</button>'}</div>`;
+    <button class="go sec2" id="klien" style="margin-top:14px">🔗 J'ai reçu un lien de carnet</button>
+    <div id="kzone" hidden><input class="field" id="kurl" placeholder="Colle ici le lien reçu" autocomplete="off"><button class="go sec2" id="kok">Ouvrir ce lien</button></div>
+    ${retourT3 ? '<button class="go sec2" id="kdef" style="margin-top:6px">‹ Revenir au carnet T3</button>' : ''}
+    ${peutAnnuler ? '<button class="go sec2" id="kann" style="margin-top:6px">‹ Annuler</button>' : ''}</div>`;
+  l.dataset.annulable = peutAnnuler ? '1' : '';
   const go = $('#kgo');
   const valider = async () => {
     const v = $('#kin').value.trim();
     if (!v) { $('#kerr').textContent = 'Tape ta clé'; return; }
-    go.textContent = 'Vérification…'; S.key = v;
+    go.textContent = 'Vérification…'; const avant = S.key; S.key = v;
     try {
       const r = await api('data');
-      if (!r.ok) { go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = r.message || 'Clé incorrecte'; return; }
+      if (!r.ok) { S.key = avant; go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = r.message || 'Clé incorrecte'; if (DEFAUT) $('#kaide').hidden = false; return; }
       LS.set('key', v); S.d = null; charger(r.data); if (S.queue.length) pomper();   // 1.8 : la file n'est plus effacée
       l.hidden = true; S.lastFetch = Date.now(); setSync('ok'); rendre();
-    } catch (e) { go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = 'Connexion impossible. Vérifie ta connexion, ou le lien de ton carnet.'; }
+    } catch (e) { S.key = avant; go.textContent = 'Ouvrir le carnet'; $('#kerr').textContent = 'Connexion impossible. Vérifie ta connexion, ou le lien de ton carnet.'; }
   };
   go.addEventListener('click', valider);
   $('#kin').addEventListener('keydown', e => { if (e.key === 'Enter') valider(); });
-  $('#klien').addEventListener('click', () => { $('#kzone').hidden = false; $('#klien').hidden = true; $('#kurl').focus(); });
+  $('#klien').addEventListener('click', () => { $('#kzone').hidden = false; $('#klien').hidden = true; $('#kaide').hidden = true; $('#kurl').focus(); });
   $('#kok').addEventListener('click', () => {   // sur iPhone, l'appli installée ne garde pas le lien : on le colle ici
     const id = lireLien($('#kurl').value);
-    if (!id) { $('#kerr').textContent = 'Ce lien n\'est pas celui d\'un carnet (il contient « #s= » ou finit par /exec).'; return; }
-    if (urlDe(id) === URL_CARNET) { $('#kzone').hidden = true; $('#klien').hidden = false; return; }
+    if (!id) { $('#kerr').textContent = 'Ce lien ne mène pas à un carnet. Colle le lien reçu par message.'; return; }
+    if (urlDe(id) === URL_CARNET) { $('#kerr').textContent = 'C\'est déjà ce carnet : il ne reste que la clé.'; $('#kzone').hidden = true; $('#klien').hidden = false; return; }
+    const c = connus(); c[id] = c[id] || { nom: '' }; LS.set('connus', c);   // collé à la main : pas de « Ouvrir ce carnet ? » en plus
     changerCarnet(urlDe(id));
   });
   if ($('#kdef')) $('#kdef').addEventListener('click', () => changerCarnet(API_URL));
+  if ($('#kann')) $('#kann').addEventListener('click', () => { l.hidden = true; l.dataset.annulable = ''; });
 }
 
 /* ================= TOAST ================= */
@@ -1879,8 +1943,8 @@ document.addEventListener('click', ev => {
     case 'k-del': supprimerConso(); break;
     case 'logout': fermer(); LS.del('key'); S.key = ''; verrouiller(); break;
     case 'partager': partagerLien(); break;
-    case 'autre-carnet': fermer(); verrouiller(); $('#klien').click(); break;
-    case 'carnet-def': changerCarnet(API_URL); break;
+    case 'autre-carnet': fermer(); verrouiller('', true); $('#klien').click(); break;
+    case 'aller-carnet': if (ID_OK.test(el.dataset.id || '')) changerCarnet(urlDe(el.dataset.id)); break;
   }
 });
 document.addEventListener('input', ev => {
@@ -1918,6 +1982,7 @@ charger = function (d) {
   addEventListener('popstate', e => {
     if (e.state && e.state.carnet === 'garde') return;
     const rester = () => history.pushState({ carnet: 'garde' }, '');
+    if (!$('#lock').hidden && $('#lock').dataset.annulable) { $('#lock').hidden = true; $('#lock').dataset.annulable = ''; rester(); return; }
     if ($('#sheet').classList.contains('on')) { fermer(); rester(); return; }
     if (S.tab !== 'bord') { S.tab = 'bord'; rendre(); scrollTo(0, 0); rester(); return; }
     history.back();
@@ -1926,6 +1991,7 @@ charger = function (d) {
 idsLocaux();
 appliquerTheme(LS.get('theme', 'chantier'));
 if (!S.key || !apiUrl()) verrouiller(); else { rendre(); rafraichir(true); pomper(); }
+if (CARNET_PROPOSE) proposerCarnet();   // 1.9 : lien d'un carnet inconnu → on demande avant d'ouvrir
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
